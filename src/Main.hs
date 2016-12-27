@@ -180,6 +180,16 @@ draw = do
   traceM "drawing"
   ud <- getAffection
   liftIO $ gegl_node_process $ nodeGraph ud M.! KeySink
+  -- mintr <- liftIO $ gegl_rectangle_intersect
+  --   (GeglRectangle 0 0 800 600)
+  --   (GeglRectangle (floor $ fst $ sPos $ ship ud) (floor $ snd $ sPos $ ship ud) 50 50)
+  -- maybe (return ()) (\intr ->
+  --   present
+  --     (GeglRectangle (floor $ fst $ sPos $ ship ud) (floor $ snd $ sPos $ ship ud) 50 50)
+  --     (buffer ud)
+  --     False
+  --   ) mintr
+  -- XXX: above part crashes regularly for no apparent reason
   present
     (GeglRectangle 0 0 800 600)
     (buffer ud)
