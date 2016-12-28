@@ -10,6 +10,8 @@ import qualified Data.Map as M
 
 import Control.Monad (when)
 
+import System.Random (randomRIO)
+
 import Debug.Trace
 
 main :: IO ()
@@ -34,8 +36,11 @@ load _ = do
     , Property "width" $ PropertyInt 50
     , Property "height" $ PropertyInt 50
     ]
-  nop <- gegl_node_new_child root $ Operation "gegl:nop" []
-  over <- gegl_node_new_child root $ defaultOverOperation
+  pnop <- gegl_node_new_child root $ Operation "gegl:nop" []
+  hnop <- gegl_node_new_child root $ Operation "gegl:nop" []
+  sover <- gegl_node_new_child root $ defaultOverOperation
+  hover <- gegl_node_new_child root $ defaultOverOperation
+  pover <- gegl_node_new_child root $ defaultOverOperation
   translate <- gegl_node_new_child root $ Operation "gegl:translate"
     [ Property "origin-x" $ PropertyDouble 25
     , Property "origin-y" $ PropertyDouble 25
@@ -58,19 +63,50 @@ load _ = do
     [ Property "buffer" $ PropertyBuffer buffer
     ]
   gegl_node_link_many [ship, rotate, translate]
-  gegl_node_link_many [over, crop, sink]
-  gegl_node_connect_to translate "output" over "aux"
+  gegl_node_link_many [pover, hover, sover, crop, sink]
+  gegl_node_connect_to translate "output" sover "aux"
+  gegl_node_connect_to pnop "output" pover "aux"
+  gegl_node_connect_to hnop "output" hover "aux"
   traceM "nodes complete"
   myMap <- return $ M.fromList
     [ (KeyRoot, root)
     , (KeyTranslate, translate)
     , (KeyRotate, rotate)
     , (KeyShip, ship)
-    , (KeyNop, nop)
+    , (KeyPNop, pnop)
+    , (KeyHNop, hnop)
     , (KeyCrop, crop)
-    , (KeyOver, over)
+    , (KeyShipOver, sover)
     , (KeySink, sink)
     ]
+  hs <- mapM (\_ -> do
+    px <- liftIO $ randomRIO (0, 800)
+    py <- liftIO $ randomRIO (0, 600)
+    vx <- liftIO $ randomRIO (0, 5)
+    vy <- liftIO $ randomRIO (0, 5)
+    div <- liftIO $ randomRIO (1, 2)
+    tempRoot <- liftIO $ gegl_node_new
+    tempOver <- liftIO $ gegl_node_new_child tempRoot $ defaultOverOperation
+    tempText <- liftIO $ gegl_node_new_child tempRoot $ textOperation
+      [ Property "string" $ PropertyString "λ"
+      , Property "color" $ PropertyColor $ GEGL.RGBA 1 1 1 1
+      , Property "size"  $ PropertyDouble 40
+      ]
+    liftIO $ gegl_node_connect_to tempText "output" tempOver "aux"
+    return Haskelloid
+      { hPos = (px, py)
+      , hVel = (vx, vy)
+      , hDiv = div
+      , hFlange = tempOver
+      , hNodeGraph = M.fromList
+        [ ("root", tempRoot)
+        , ("over", tempOver)
+        , ("text", tempText)
+        ]
+      }
+    ) [1..5]
+  liftIO $ gegl_node_link_many $ map hFlange hs
+  liftIO $ gegl_node_link (last $ map hFlange hs) hnop
   return $ UserData
     { nodeGraph = myMap
     , ship      = Ship
@@ -80,14 +116,15 @@ load _ = do
       , sFlange = rotate
       }
     , buffer = buffer
-    , shots = ParticleSystem (ParticleStorage Nothing []) over buffer
+    , shots = ParticleSystem (ParticleStorage Nothing []) pnop buffer
+    , haskelloids = hs
     }
 
 data UserData = UserData
   { nodeGraph :: M.Map NodeKey GeglNode
   , ship :: Ship
   , buffer :: GeglBuffer
-  -- , haskelloids :: ParticleSystem
+  , haskelloids :: [Haskelloid]
   , shots :: ParticleSystem
   -- , debris :: ParticleSystem
   }
@@ -99,14 +136,23 @@ data Ship = Ship
   , sFlange :: GeglNode
   }
 
+data Haskelloid = Haskelloid
+  { hPos :: (Double, Double)
+  , hVel :: (Double, Double)
+  , hDiv :: Int
+  , hFlange :: GeglNode
+  , hNodeGraph :: M.Map String GeglNode
+  }
+
 data NodeKey
   = KeyRoot
   | KeyTranslate
   | KeyRotate
   | KeyShip
-  | KeyNop
+  | KeyPNop
+  | KeyHNop
   | KeyCrop
-  | KeyOver
+  | KeyShipOver
   | KeySink
   deriving (Ord, Eq)
 
@@ -219,11 +265,13 @@ update sec = do
     [ Property "degrees" $ PropertyDouble $ sRot $ ship ud2
     ]
   ups <- updateParticleSystem (shots ud2) sec shotsUpd shotsDraw
+  nhs <- mapM (updateHaskelloid sec) (haskelloids ud2)
   putAffection ud2
     { ship = (ship ud2)
       { sPos = (nnx, nny)
       }
     , shots = ups
+    , haskelloids = nhs
     }
 
 wrapAround (nx, ny) width = (nnx, nny)
@@ -278,7 +326,11 @@ shotsUpd sec part@Particle{..} = do
 
 shotsDraw :: GeglBuffer -> GeglNode -> Particle -> Affection UserData ()
 shotsDraw buf node Particle{..} = do
-  present
-    (GeglRectangle (floor $ fst particlePosition - 2) (floor $ snd particlePosition - 2) 4 4)
-    buf
-    False
+  -- present
+  --   (GeglRectangle (floor $ fst particlePosition - 2) (floor $ snd particlePosition - 2) 4 4)
+  --   buf
+  --   False
+  return ()
+
+updateHaskelloid :: Double -> Haskelloid -> Affection UserData Haskelloid
+updateHaskelloid sec h@Haskelloid{..} = return h
