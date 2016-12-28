@@ -57,10 +57,9 @@ load _ = do
   sink <- gegl_node_new_child root $ Operation "gegl:copy-buffer"
     [ Property "buffer" $ PropertyBuffer buffer
     ]
-  -- gegl_node_link_many [over, crop, sink]
-  -- gegl_node_link_many [ship, translate, rotate]
-  gegl_node_link_many [ship, rotate, translate, crop, sink]
-  gegl_node_connect_to rotate "output" over "aux"
+  gegl_node_link_many [ship, rotate, translate]
+  gegl_node_link_many [over, crop, sink]
+  gegl_node_connect_to translate "output" over "aux"
   traceM "nodes complete"
   myMap <- return $ M.fromList
     [ (KeyRoot, root)
