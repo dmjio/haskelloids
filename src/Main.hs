@@ -80,26 +80,44 @@ load _ = do
   hs <- mapM (\_ -> do
     px <- liftIO $ randomRIO (0, 800)
     py <- liftIO $ randomRIO (0, 600)
-    vx <- liftIO $ randomRIO (0, 5)
-    vy <- liftIO $ randomRIO (0, 5)
+    vx <- liftIO $ randomRIO (-10, 10)
+    vy <- liftIO $ randomRIO (-10, 10)
     div <- liftIO $ randomRIO (1, 2)
+    rot <- liftIO $ randomRIO (-2 * pi, 2 * pi)
+    pitch <- liftIO $ randomRIO (-2 * pi, 2 * pi)
     tempRoot <- liftIO $ gegl_node_new
     tempOver <- liftIO $ gegl_node_new_child tempRoot $ defaultOverOperation
     tempText <- liftIO $ gegl_node_new_child tempRoot $ textOperation
       [ Property "string" $ PropertyString "λ"
       , Property "color" $ PropertyColor $ GEGL.RGBA 1 1 1 1
-      , Property "size"  $ PropertyDouble 40
+      , Property "size"  $ PropertyDouble 100
       ]
-    liftIO $ gegl_node_connect_to tempText "output" tempOver "aux"
+    tempTrans <- liftIO $ gegl_node_new_child tempRoot $ Operation "gegl:translate"
+      [ Property "x" $ PropertyDouble px
+      , Property "y" $ PropertyDouble py
+      , Property "sampler"  $ PropertyInt $ fromEnum GeglSamplerCubic
+      ]
+    tempRot <- liftIO $ gegl_node_new_child tempRoot $ Operation "gegl:rotate"
+      [ Property "origin-x" $ PropertyDouble 50
+      , Property "origin-y" $ PropertyDouble 50
+      , Property "degrees" $ PropertyDouble rot
+      , Property "sampler"  $ PropertyInt $ fromEnum GeglSamplerCubic
+      ]
+    liftIO $ gegl_node_link_many [tempText, tempRot, tempTrans]
+    liftIO $ gegl_node_connect_to tempTrans "output" tempOver "aux"
     return Haskelloid
       { hPos = (px, py)
       , hVel = (vx, vy)
+      , hRot = rot
+      , hPitch = pitch
       , hDiv = div
       , hFlange = tempOver
       , hNodeGraph = M.fromList
         [ ("root", tempRoot)
         , ("over", tempOver)
         , ("text", tempText)
+        , ("trans", tempTrans)
+        , ("rot", tempRot)
         ]
       }
     ) [1..5]
@@ -137,6 +155,8 @@ data Ship = Ship
 data Haskelloid = Haskelloid
   { hPos :: (Double, Double)
   , hVel :: (Double, Double)
+  , hRot :: Double
+  , hPitch :: Double
   , hDiv :: Int
   , hFlange :: GeglNode
   , hNodeGraph :: M.Map String GeglNode
@@ -191,7 +211,7 @@ update sec = do
                    { sVel = (vx, vy)
                    }
                  }
-               traceM $ show (vx, vy) ++ " " ++ show ((*) 2 $ sRot $ ship ud)
+               traceM $ show (vx, vy) ++ " " ++ show (sRot $ ship ud)
            SDL.KeycodeSpace ->
              when (SDL.keyboardEventKeyMotion dat == SDL.Pressed) $ do
                ud <- getAffection
@@ -208,7 +228,7 @@ update sec = do
                liftIO $ gegl_node_connect_to tempRect "output" tempOver "aux"
                ips <- insertParticle (shots ud) $
                  Particle
-                   { particleTimeToLive = 10
+                   { particleTimeToLive = 5
                    , particleCreation = elapsedTime ad
                    , particlePosition =
                      ( (fst $ sPos $ ship ud) + 23
@@ -234,7 +254,6 @@ update sec = do
                putAffection $ ud
                  { shots = ips
                  }
-                   -- XXX: Continue here
            _ -> return ()
       SDL.WindowClosedEvent _ -> do
         traceM "seeya!"
@@ -246,14 +265,6 @@ update sec = do
   ud2 <- getAffection
   let nx = fst (sPos $ ship ud2) + (fst (sVel $ ship ud2)) * sec
       ny = snd (sPos $ ship ud2) + (snd (sVel $ ship ud2)) * sec
-      -- nnx =
-      --   if nx > 800
-      --   then nx - 850
-      --   else if nx < -50 then nx + 850 else nx
-      -- nny =
-      --   if ny > 600
-      --   then ny - 650
-      --   else if ny < -50 then ny + 650 else ny
       (nnx, nny) = wrapAround (nx, ny) 50
   liftIO $ gegl_node_set (nodeGraph ud2 M.! KeyTranslate) $ Operation "gegl:translate"
     [ Property "x" $ PropertyDouble $ nnx
@@ -313,10 +324,10 @@ shotsUpd :: Double -> Particle -> Affection UserData Particle
 shotsUpd sec part@Particle{..} = do
   let newX = (fst particlePosition) + sec * (fromIntegral $ fst particleVelocity)
       newY = (snd particlePosition) + sec * (fromIntegral $ snd particleVelocity)
-      (nnx, nny) = wrapAround (newX, newY) 2
+      (nnx, nny) = wrapAround (newX, newY) 4
   liftIO $ gegl_node_set (particleNodeGraph M.! "rect") $ Operation "gegl:rectangle"
-    [ Property "x" $ (PropertyDouble $ nnx - 2)
-    , Property "y" $ (PropertyDouble $ nny - 2)
+    [ Property "x" $ PropertyDouble $ nnx - 2
+    , Property "y" $ PropertyDouble $ nny - 2
     ]
   return part
     { particlePosition = (nnx, nny)
@@ -331,4 +342,19 @@ shotsDraw buf node Particle{..} = do
   return ()
 
 updateHaskelloid :: Double -> Haskelloid -> Affection UserData Haskelloid
-updateHaskelloid sec h@Haskelloid{..} = return h
+updateHaskelloid sec h@Haskelloid{..} = do
+  let newX = (fst $ hPos) + sec * (fst $ hVel)
+      newY = (snd $ hPos) + sec * (snd $ hVel)
+      newRot = hRot + hPitch * sec
+      (nnx, nny) = wrapAround (newX, newY) (50 / fromIntegral hDiv)
+  liftIO $ gegl_node_set (hNodeGraph M.! "trans") $ Operation "gegl:translate"
+    [ Property "x" $ PropertyDouble $ nnx - (50 / fromIntegral hDiv)
+    , Property "y" $ PropertyDouble $ nny - (50 / fromIntegral hDiv)
+    ]
+  liftIO $ gegl_node_set (hNodeGraph M.! "rot") $ Operation "gegl:rotate"
+    [ Property "degrees" $ PropertyDouble newRot
+    ]
+  return h
+    { hPos = (nnx, nny)
+    , hRot = newRot
+    }
