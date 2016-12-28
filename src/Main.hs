@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, RecordWildCards #-}
 module Main where
 
 import Affection
@@ -80,12 +80,16 @@ load _ = do
       , sFlange = rotate
       }
     , buffer = buffer
+    , shots = ParticleSystem (ParticleStorage Nothing []) over buffer
     }
 
 data UserData = UserData
   { nodeGraph :: M.Map NodeKey GeglNode
   , ship :: Ship
   , buffer :: GeglBuffer
+  -- , haskelloids :: ParticleSystem
+  , shots :: ParticleSystem
+  -- , debris :: ParticleSystem
   }
 
 data Ship = Ship
@@ -142,6 +146,49 @@ update sec = do
                    }
                  }
                traceM $ show (vx, vy) ++ " " ++ show ((*) 2 $ sRot $ ship ud)
+           SDL.KeycodeSpace ->
+             when (SDL.keyboardEventKeyMotion dat == SDL.Pressed) $ do
+               ud <- getAffection
+               ad <- get
+               tempRoot <- liftIO $ gegl_node_new
+               tempRect <- liftIO $ gegl_node_new_child tempRoot $ Operation "gegl:rectangle"
+                 [ Property "x" $ (PropertyDouble $ (fst $ sPos $ ship ud) + 23)
+                 , Property "y" $ (PropertyDouble $ (snd $ sPos $ ship ud) + 23)
+                 , Property "width" $ PropertyDouble 4
+                 , Property "height" $ PropertyDouble 4
+                 , Property "color" $ PropertyColor $ (GEGL.RGBA 1 1 1 1)
+                 ]
+               tempOver <- liftIO $ gegl_node_new_child tempRoot $ defaultOverOperation
+               liftIO $ gegl_node_connect_to tempRect "output" tempOver "aux"
+               ips <- insertParticle (shots ud) $
+                 Particle
+                   { particleTimeToLive = 10
+                   , particleCreation = elapsedTime ad
+                   , particlePosition =
+                     ( (fst $ sPos $ ship ud) + 23
+                     , (snd $ sPos $ ship ud) + 23
+                     )
+                   , particleRotation = Rad 0
+                   , particleVelocity =
+                     -- ( (floor $ -200 * (sin $ toR $ (sRot $ ship ud) + (fst $ sVel $ ship ud)))
+                     -- , (floor $ -200 * (cos $ toR $ (sRot $ ship ud) + (snd $ sVel $ ship ud)))
+                     ( (floor $ -200 * (sin $ toR $ sRot $ ship ud))
+                     , (floor $ -200 * (cos $ toR $ sRot $ ship ud))
+                     )
+                   , particlePitchRate = Rad 0
+                   , particleRootNode = tempRoot
+                   , particleNodeGraph = M.fromList
+                     [ ("root", tempRoot)
+                     , ("over", tempOver)
+                     , ("rect", tempRect)
+                     ]
+                   , particleStackCont = tempOver
+                   , particleDrawFlange = tempOver
+                   }
+               putAffection $ ud
+                 { shots = ips
+                 }
+                   -- XXX: Continue here
            _ -> return ()
       SDL.WindowClosedEvent _ -> do
         traceM "seeya!"
@@ -168,10 +215,12 @@ update sec = do
   liftIO $ gegl_node_set (nodeGraph ud2 M.! KeyRotate) $ Operation "gegl:rotate"
     [ Property "degrees" $ PropertyDouble $ sRot $ ship ud2
     ]
+  ups <- updateParticleSystem (shots ud2) sec shotsUpd shotsDraw
   putAffection ud2
     { ship = (ship ud2)
       { sPos = (nnx, nny)
       }
+    , shots = ups
     }
 
 draw :: Affection UserData ()
@@ -199,3 +248,23 @@ clean ud = return ()
 
 toR :: Double -> Double
 toR deg = deg * pi / 180
+
+shotsUpd :: Double -> Particle -> Affection UserData Particle
+shotsUpd sec part@Particle{..} = do
+  let newX = (fst particlePosition) + sec * (fromIntegral $ fst particleVelocity)
+      newY = (snd particlePosition) + sec * (fromIntegral $ snd particleVelocity)
+      (nnx, nny) = wrapAround (newX, newY) 2
+  liftIO $ gegl_node_set (particleNodeGraph M.! "rect") $ Operation "gegl:rectangle"
+    [ Property "x" $ (PropertyDouble $ nnx - 2)
+    , Property "y" $ (PropertyDouble $ nny - 2)
+    ]
+  return part
+    { particlePosition = (nnx, nny)
+    }
+
+shotsDraw :: GeglBuffer -> GeglNode -> Particle -> Affection UserData ()
+shotsDraw buf node Particle{..} = do
+  present
+    (GeglRectangle (floor $ fst particlePosition - 2) (floor $ snd particlePosition - 2) 4 4)
+    buf
+    False
