@@ -72,8 +72,16 @@ load _ = do
     , Property "size"   $ PropertyDouble 100
     , Property "color"  $ PropertyColor $ GEGL.RGBA 1 1 1 1
     ]
+  vignette <- gegl_node_new_child root $ Operation "gegl:vignette" []
+  pixelize <- gegl_node_new_child root $ Operation "gegl:pixelize"
+    [ Property "size-x" $ PropertyInt 3
+    , Property "size-y" $ PropertyInt 3
+    ]
+  -- vdeg <- gegl_node_new_child root $ Operation "gegl:video-degradation"
+  --   [ Property "pattern" $ PropertyInt 8
+  --   ]
   gegl_node_link_many [ship, rotate, translate]
-  gegl_node_link_many [pover, hover, sover, crop, sink]
+  gegl_node_link_many [pover, hover, sover, crop, pixelize, vignette, sink]
   _ <- gegl_node_connect_to translate "output" sover "aux"
   _ <- gegl_node_connect_to pnop "output" pover "aux"
   _ <- gegl_node_connect_to hnop "output" hover "aux"
@@ -90,6 +98,7 @@ load _ = do
     , (KeySink, sink)
     , (KeyWon, won)
     , (KeyLost, lost)
+    , (KeyPixelize, pixelize)
     ]
   hs <- catMaybes <$> foldM (\acc _ -> do
     px <- liftIO $ randomRIO (0, 800)
@@ -151,6 +160,7 @@ data NodeKey
   | KeySink
   | KeyWon
   | KeyLost
+  | KeyPixelize
   deriving (Ord, Eq)
 
 update :: Double -> Affection UserData ()
@@ -301,7 +311,7 @@ draw = do
     (not $ wonlost ud)
 
 clean :: UserData -> IO ()
-clean _ = return ()
+clean ud = gegl_node_drop $ nodeGraph ud M.! KeyRoot
 
 toR :: Double -> Double
 toR deg = deg * pi / 180
@@ -340,7 +350,7 @@ shotsUpd sec part@Particle{..} = do
       )
   maybe (return ()) (\_ -> do
     liftIO $ traceIO "YOU LOST!"
-    liftIO $ gegl_node_link (nodeGraph ud M.! KeyLost) (nodeGraph ud M.! KeySink)
+    liftIO $ gegl_node_link (nodeGraph ud M.! KeyLost) (nodeGraph ud M.! KeyPixelize)
     putAffection ud
       { wonlost = True
       }
@@ -353,6 +363,7 @@ shotsUpd sec part@Particle{..} = do
 haskelloidShotDown :: Haskelloid -> Affection UserData ()
 haskelloidShotDown h = do
   -- liftIO $ traceIO "Haskelloid shot down"
+  liftIO $ gegl_node_drop $ hNodeGraph h M.! "root"
   ud <- getAffection
   let redHaskelloids = delete h (haskelloids ud)
   newHaskelloids <- catMaybes <$> foldM
@@ -373,7 +384,7 @@ haskelloidShotDown h = do
       (nodeGraph ud M.! KeyHNop)
   else do
     liftIO $ traceIO "YOU WON!"
-    liftIO $ gegl_node_link (nodeGraph ud M.! KeyWon) (nodeGraph ud M.! KeySink)
+    liftIO $ gegl_node_link (nodeGraph ud M.! KeyWon) (nodeGraph ud M.! KeyPixelize)
     putAffection ud
       { wonlost = True
       }
@@ -408,7 +419,7 @@ updateHaskelloid sec h@Haskelloid{..} = do
       )
   maybe (return ()) (\_ -> do
     liftIO $ traceIO "YOU LOST!"
-    liftIO $ gegl_node_link (nodeGraph ud M.! KeyLost) (nodeGraph ud M.! KeySink)
+    liftIO $ gegl_node_link (nodeGraph ud M.! KeyLost) (nodeGraph ud M.! KeyPixelize)
     putAffection ud
       { wonlost = True
       }
