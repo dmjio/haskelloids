@@ -124,7 +124,7 @@ update sec = do
              when (SDL.keyboardEventKeyMotion dat == SDL.Pressed) $
                putAffection ud
                  { ship = (ship ud)
-                   { sRot = (sRot $ ship ud) + 90 * sec
+                   { sRot = (sRot $ ship ud) + 180 * sec
                    }
                  }
            SDL.KeycodeRight -> do
@@ -132,14 +132,16 @@ update sec = do
              when (SDL.keyboardEventKeyMotion dat == SDL.Pressed) $
                putAffection ud
                  { ship = (ship ud)
-                   { sRot = (sRot $ ship ud) - 90 * sec
+                   { sRot = (sRot $ ship ud) - 180 * sec
                    }
                  }
            SDL.KeycodeUp ->
              when (SDL.keyboardEventKeyMotion dat == SDL.Pressed) $ do
                ud <- getAffection
-               let vx = -10 * (sin (toR $ 2 * (sRot $ ship ud))) + fst (sVel $ ship ud)
-                   vy = -10 * (cos (toR $ 2 * (sRot $ ship ud))) + snd (sVel $ ship ud)
+               -- let vx = -10 * (sin (toR $ 2 * (sRot $ ship ud))) + fst (sVel $ ship ud)
+               --     vy = -10 * (cos (toR $ 2 * (sRot $ ship ud))) + snd (sVel $ ship ud)
+               let vx = -10 * (sin (toR $ (sRot $ ship ud))) + fst (sVel $ ship ud)
+                   vy = -10 * (cos (toR $ (sRot $ ship ud))) + snd (sVel $ ship ud)
                putAffection ud
                  { ship = (ship ud)
                    { sVel = (vx, vy)
