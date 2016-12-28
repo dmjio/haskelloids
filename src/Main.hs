@@ -62,6 +62,16 @@ load _ = do
   sink <- gegl_node_new_child root $ Operation "gegl:copy-buffer"
     [ Property "buffer" $ PropertyBuffer buffer
     ]
+  won <- gegl_node_new_child root $ textOperation
+    [ Property "string" $ PropertyString "YOU WON!"
+    , Property "size"   $ PropertyDouble 100
+    , Property "color"  $ PropertyColor $ GEGL.RGBA 1 1 1 1
+    ]
+  lost <- gegl_node_new_child root $ textOperation
+    [ Property "string" $ PropertyString "YOU LOST!"
+    , Property "size"   $ PropertyDouble 100
+    , Property "color"  $ PropertyColor $ GEGL.RGBA 1 1 1 1
+    ]
   gegl_node_link_many [ship, rotate, translate]
   gegl_node_link_many [pover, hover, sover, crop, sink]
   _ <- gegl_node_connect_to translate "output" sover "aux"
@@ -78,6 +88,8 @@ load _ = do
     , (KeyCrop, crop)
     , (KeyShipOver, sover)
     , (KeySink, sink)
+    , (KeyWon, won)
+    , (KeyLost, lost)
     ]
   hs <- catMaybes <$> foldM (\acc _ -> do
     px <- liftIO $ randomRIO (0, 800)
@@ -97,6 +109,7 @@ load _ = do
     , buffer = buffer
     , shots = ParticleSystem (ParticleStorage Nothing []) pnop buffer
     , haskelloids = hs
+    , wonlost = False
     }
 
 data UserData = UserData
@@ -106,6 +119,7 @@ data UserData = UserData
   , haskelloids :: [Haskelloid]
   , shots :: ParticleSystem
   -- , debris :: ParticleSystem
+  , wonlost :: Bool
   }
 
 data Ship = Ship
@@ -135,118 +149,124 @@ data NodeKey
   | KeyCrop
   | KeyShipOver
   | KeySink
+  | KeyWon
+  | KeyLost
   deriving (Ord, Eq)
 
 update :: Double -> Affection UserData ()
 update sec = do
   -- traceM $ (show $ 1 / sec) ++ " FPS"
   ad <- get
-  evs <- SDL.pollEvents
-  mapM_ (\e ->
-    case SDL.eventPayload e of
-      SDL.KeyboardEvent dat ->
-        case (SDL.keysymKeycode $ SDL.keyboardEventKeysym dat) of
-           SDL.KeycodeLeft -> do
-             ud <- getAffection
-             when (SDL.keyboardEventKeyMotion dat == SDL.Pressed) $
-               putAffection ud
-                 { ship = (ship ud)
-                   { sRot = (sRot $ ship ud) + 180 * sec
-                   }
-                 }
-           SDL.KeycodeRight -> do
-             ud <- getAffection
-             when (SDL.keyboardEventKeyMotion dat == SDL.Pressed) $
-               putAffection ud
-                 { ship = (ship ud)
-                   { sRot = (sRot $ ship ud) - 180 * sec
-                   }
-                 }
-           SDL.KeycodeUp ->
-             when (SDL.keyboardEventKeyMotion dat == SDL.Pressed) $ do
+  wd <- getAffection
+  if (not $ wonlost wd)
+  then do
+    evs <- SDL.pollEvents
+    mapM_ (\e ->
+      case SDL.eventPayload e of
+        SDL.KeyboardEvent dat ->
+          case (SDL.keysymKeycode $ SDL.keyboardEventKeysym dat) of
+             SDL.KeycodeLeft -> do
                ud <- getAffection
-               let vx = -10 * (sin (toR $ (sRot $ ship ud))) + fst (sVel $ ship ud)
-                   vy = -10 * (cos (toR $ (sRot $ ship ud))) + snd (sVel $ ship ud)
-               putAffection ud
-                 { ship = (ship ud)
-                   { sVel = (vx, vy)
+               when (SDL.keyboardEventKeyMotion dat == SDL.Pressed) $
+                 putAffection ud
+                   { ship = (ship ud)
+                     { sRot = (sRot $ ship ud) + 180 * sec
+                     }
                    }
-                 }
-               -- traceM $ show (vx, vy) ++ " " ++ show (sRot $ ship ud)
-           SDL.KeycodeSpace ->
-             when (SDL.keyboardEventKeyMotion dat == SDL.Pressed) $ do
+             SDL.KeycodeRight -> do
                ud <- getAffection
-               -- ad <- get
-               let posX = (fst $ sPos $ ship ud) + 23 - 30 * sin (toR $ sRot $ ship ud)
-                   posY = (snd $ sPos $ ship ud) + 23 - 30 * cos (toR $ sRot $ ship ud)
-               tempRoot <- liftIO $ gegl_node_new
-               tempRect <- liftIO $ gegl_node_new_child tempRoot $ Operation "gegl:rectangle"
-                 [ Property "x" $ PropertyDouble $ posX
-                 , Property "y" $ PropertyDouble $ posY
-                 , Property "width" $ PropertyDouble 4
-                 , Property "height" $ PropertyDouble 4
-                 , Property "color" $ PropertyColor $ (GEGL.RGBA 1 1 1 1)
-                 ]
-               tempOver <- liftIO $ gegl_node_new_child tempRoot $ defaultOverOperation
-               _ <- liftIO $ gegl_node_connect_to tempRect "output" tempOver "aux"
-               ips <- insertParticle (shots ud) $
-                 Particle
-                   { particleTimeToLive = 5
-                   , particleCreation = elapsedTime ad
-                   , particlePosition = (posX, posY)
-                   , particleRotation = Rad 0
-                   , particleVelocity =
-                     -- ( (floor $ -200 * (sin $ toR $ (sRot $ ship ud) + (fst $ sVel $ ship ud)))
-                     -- , (floor $ -200 * (cos $ toR $ (sRot $ ship ud) + (snd $ sVel $ ship ud)))
-                     ( (floor $ -200 * (sin $ toR $ sRot $ ship ud))
-                     , (floor $ -200 * (cos $ toR $ sRot $ ship ud))
-                     )
-                   , particlePitchRate = Rad 0
-                   , particleRootNode = tempRoot
-                   , particleNodeGraph = M.fromList
-                     [ ("root", tempRoot)
-                     , ("over", tempOver)
-                     , ("rect", tempRect)
-                     ]
-                   , particleStackCont = tempOver
-                   , particleDrawFlange = tempOver
+               when (SDL.keyboardEventKeyMotion dat == SDL.Pressed) $
+                 putAffection ud
+                   { ship = (ship ud)
+                     { sRot = (sRot $ ship ud) - 180 * sec
+                     }
                    }
-               putAffection $ ud
-                 { shots = ips
-                 }
-           _ -> return ()
-      SDL.WindowClosedEvent _ -> do
-        traceM "seeya!"
-        put ad
-          { quitEvent = True
-          }
-      _ -> return ()
-    ) evs
-  ud2 <- getAffection
-  nhs <- mapM (updateHaskelloid sec) (haskelloids ud2)
-  -- liftIO $ traceIO $ show $ length nhs
-  putAffection ud2
-    { haskelloids = nhs
-    }
-  ud3 <- getAffection
-  let nx = fst (sPos $ ship ud3) + (fst (sVel $ ship ud3)) * sec
-      ny = snd (sPos $ ship ud3) + (snd (sVel $ ship ud3)) * sec
-      (nnx, nny) = wrapAround (nx, ny) 50
-  liftIO $ gegl_node_set (nodeGraph ud3 M.! KeyTranslate) $ Operation "gegl:translate"
-    [ Property "x" $ PropertyDouble $ nnx
-    , Property "y" $ PropertyDouble $ nny
-    ]
-  liftIO $ gegl_node_set (nodeGraph ud3 M.! KeyRotate) $ Operation "gegl:rotate"
-    [ Property "degrees" $ PropertyDouble $ sRot $ ship ud3
-    ]
-  ups <- updateParticleSystem (shots ud3) sec shotsUpd shotsDraw
-  ud4 <- getAffection
-  putAffection ud4
-    { ship = (ship ud3)
-      { sPos = (nnx, nny)
+             SDL.KeycodeUp ->
+               when (SDL.keyboardEventKeyMotion dat == SDL.Pressed) $ do
+                 ud <- getAffection
+                 let vx = -10 * (sin (toR $ (sRot $ ship ud))) + fst (sVel $ ship ud)
+                     vy = -10 * (cos (toR $ (sRot $ ship ud))) + snd (sVel $ ship ud)
+                 putAffection ud
+                   { ship = (ship ud)
+                     { sVel = (vx, vy)
+                     }
+                   }
+                 -- traceM $ show (vx, vy) ++ " " ++ show (sRot $ ship ud)
+             SDL.KeycodeSpace ->
+               when (SDL.keyboardEventKeyMotion dat == SDL.Pressed) $ do
+                 ud <- getAffection
+                 -- ad <- get
+                 let posX = (fst $ sPos $ ship ud) + 23 - 30 * sin (toR $ sRot $ ship ud)
+                     posY = (snd $ sPos $ ship ud) + 23 - 30 * cos (toR $ sRot $ ship ud)
+                 tempRoot <- liftIO $ gegl_node_new
+                 tempRect <- liftIO $ gegl_node_new_child tempRoot $ Operation "gegl:rectangle"
+                   [ Property "x" $ PropertyDouble $ posX
+                   , Property "y" $ PropertyDouble $ posY
+                   , Property "width" $ PropertyDouble 4
+                   , Property "height" $ PropertyDouble 4
+                   , Property "color" $ PropertyColor $ (GEGL.RGBA 1 1 1 1)
+                   ]
+                 tempOver <- liftIO $ gegl_node_new_child tempRoot $ defaultOverOperation
+                 _ <- liftIO $ gegl_node_connect_to tempRect "output" tempOver "aux"
+                 ips <- insertParticle (shots ud) $
+                   Particle
+                     { particleTimeToLive = 5
+                     , particleCreation = elapsedTime ad
+                     , particlePosition = (posX, posY)
+                     , particleRotation = Rad 0
+                     , particleVelocity =
+                       -- ( (floor $ -200 * (sin $ toR $ (sRot $ ship ud) + (fst $ sVel $ ship ud)))
+                       -- , (floor $ -200 * (cos $ toR $ (sRot $ ship ud) + (snd $ sVel $ ship ud)))
+                       ( (floor $ -200 * (sin $ toR $ sRot $ ship ud))
+                       , (floor $ -200 * (cos $ toR $ sRot $ ship ud))
+                       )
+                     , particlePitchRate = Rad 0
+                     , particleRootNode = tempRoot
+                     , particleNodeGraph = M.fromList
+                       [ ("root", tempRoot)
+                       , ("over", tempOver)
+                       , ("rect", tempRect)
+                       ]
+                     , particleStackCont = tempOver
+                     , particleDrawFlange = tempOver
+                     }
+                 putAffection $ ud
+                   { shots = ips
+                   }
+             _ -> return ()
+        SDL.WindowClosedEvent _ -> do
+          traceM "seeya!"
+          put ad
+            { quitEvent = True
+            }
+        _ -> return ()
+      ) evs
+    ud2 <- getAffection
+    nhs <- mapM (updateHaskelloid sec) (haskelloids ud2)
+    -- liftIO $ traceIO $ show $ length nhs
+    putAffection ud2
+      { haskelloids = nhs
       }
-    , shots = ups
-    }
+    ud3 <- getAffection
+    let nx = fst (sPos $ ship ud3) + (fst (sVel $ ship ud3)) * sec
+        ny = snd (sPos $ ship ud3) + (snd (sVel $ ship ud3)) * sec
+        (nnx, nny) = wrapAround (nx, ny) 50
+    liftIO $ gegl_node_set (nodeGraph ud3 M.! KeyTranslate) $ Operation "gegl:translate"
+      [ Property "x" $ PropertyDouble $ nnx
+      , Property "y" $ PropertyDouble $ nny
+      ]
+    liftIO $ gegl_node_set (nodeGraph ud3 M.! KeyRotate) $ Operation "gegl:rotate"
+      [ Property "degrees" $ PropertyDouble $ sRot $ ship ud3
+      ]
+    ups <- updateParticleSystem (shots ud3) sec shotsUpd shotsDraw
+    ud4 <- getAffection
+    putAffection ud4
+      { ship = (ship ud3)
+        { sPos = (nnx, nny)
+        }
+      , shots = ups
+      }
+  else return ()
 
 wrapAround :: (Ord t, Num t) => (t, t) -> t -> (t, t)
 wrapAround (nx, ny) width = (nnx, nny)
@@ -278,7 +298,7 @@ draw = do
   present
     (GeglRectangle 0 0 800 600)
     (buffer ud)
-    False
+    (not $ wonlost ud)
 
 clean :: UserData -> IO ()
 clean _ = return ()
@@ -319,10 +339,10 @@ shotsUpd sec part@Particle{..} = do
       50
       )
   maybe (return ()) (\_ -> do
-    ad <- get
     liftIO $ traceIO "YOU LOST!"
-    put ad
-      { quitEvent = True
+    liftIO $ gegl_node_link (nodeGraph ud M.! KeyLost) (nodeGraph ud M.! KeySink)
+    putAffection ud
+      { wonlost = True
       }
     ) lost
   return part
@@ -352,10 +372,10 @@ haskelloidShotDown h = do
       (last $ map hFlange newHaskelloids)
       (nodeGraph ud M.! KeyHNop)
   else do
-    ad <- get
     liftIO $ traceIO "YOU WON!"
-    put ad
-      { quitEvent = True
+    liftIO $ gegl_node_link (nodeGraph ud M.! KeyWon) (nodeGraph ud M.! KeySink)
+    putAffection ud
+      { wonlost = True
       }
   putAffection ud
     { haskelloids = newHaskelloids
@@ -387,10 +407,10 @@ updateHaskelloid sec h@Haskelloid{..} = do
       50
       )
   maybe (return ()) (\_ -> do
-    ad <- get
     liftIO $ traceIO "YOU LOST!"
-    put ad
-      { quitEvent = True
+    liftIO $ gegl_node_link (nodeGraph ud M.! KeyLost) (nodeGraph ud M.! KeySink)
+    putAffection ud
+      { wonlost = True
       }
     ) lost
   return h
