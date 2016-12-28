@@ -42,10 +42,8 @@ load _ = do
   hover <- gegl_node_new_child root $ defaultOverOperation
   pover <- gegl_node_new_child root $ defaultOverOperation
   translate <- gegl_node_new_child root $ Operation "gegl:translate"
-    [ Property "origin-x" $ PropertyDouble 25
-    , Property "origin-y" $ PropertyDouble 25
-    , Property "x"        $ PropertyDouble 400
-    , Property "y"        $ PropertyDouble 300
+    [ Property "x"        $ PropertyDouble 375
+    , Property "y"        $ PropertyDouble 275
     , Property "sampler"  $ PropertyInt $ fromEnum GeglSamplerCubic
     ]
   rotate <- gegl_node_new_child root $ Operation "gegl:rotate"
