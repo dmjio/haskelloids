@@ -177,10 +177,12 @@ update sec = do
              when (SDL.keyboardEventKeyMotion dat == SDL.Pressed) $ do
                ud <- getAffection
                -- ad <- get
+               let posX = (fst $ sPos $ ship ud) + 23 - 30 * sin (toR $ sRot $ ship ud)
+                   posY = (snd $ sPos $ ship ud) + 23 - 30 * cos (toR $ sRot $ ship ud)
                tempRoot <- liftIO $ gegl_node_new
                tempRect <- liftIO $ gegl_node_new_child tempRoot $ Operation "gegl:rectangle"
-                 [ Property "x" $ (PropertyDouble $ (fst $ sPos $ ship ud) + 23)
-                 , Property "y" $ (PropertyDouble $ (snd $ sPos $ ship ud) + 23)
+                 [ Property "x" $ PropertyDouble $ posX
+                 , Property "y" $ PropertyDouble $ posY
                  , Property "width" $ PropertyDouble 4
                  , Property "height" $ PropertyDouble 4
                  , Property "color" $ PropertyColor $ (GEGL.RGBA 1 1 1 1)
@@ -191,10 +193,7 @@ update sec = do
                  Particle
                    { particleTimeToLive = 5
                    , particleCreation = elapsedTime ad
-                   , particlePosition =
-                     ( (fst $ sPos $ ship ud) + 23
-                     , (snd $ sPos $ ship ud) + 23
-                     )
+                   , particlePosition = (posX, posY)
                    , particleRotation = Rad 0
                    , particleVelocity =
                      -- ( (floor $ -200 * (sin $ toR $ (sRot $ ship ud) + (fst $ sVel $ ship ud)))
@@ -225,7 +224,7 @@ update sec = do
     ) evs
   ud2 <- getAffection
   nhs <- mapM (updateHaskelloid sec) (haskelloids ud2)
-  liftIO $ traceIO $ show $ length nhs
+  -- liftIO $ traceIO $ show $ length nhs
   putAffection ud2
     { haskelloids = nhs
     }
@@ -263,7 +262,7 @@ wrapAround (nx, ny) width = (nnx, nny)
 
 draw :: Affection UserData ()
 draw = do
-  traceM "drawing"
+  -- traceM "drawing"
   ud <- getAffection
   liftIO $ gegl_node_process $ nodeGraph ud M.! KeySink
   -- mintr <- liftIO $ gegl_rectangle_intersect
@@ -311,8 +310,21 @@ shotsUpd sec part@Particle{..} = do
       Nothing -> return Nothing
     ) (haskelloids ud)
   killings <- mapM haskelloidShotDown inters
-  ud2 <- getAffection
-  liftIO $ traceIO $ show $ length $ haskelloids ud2
+  lost <- liftIO $ gegl_rectangle_intersect
+    (GeglRectangle (floor nnx) (floor nny) 4 4)
+    (GeglRectangle
+      (floor $ fst $ sPos $ ship ud)
+      (floor $ snd $ sPos $ ship ud)
+      50
+      50
+      )
+  maybe (return ()) (\_ -> do
+    ad <- get
+    liftIO $ traceIO "YOU LOST!"
+    put ad
+      { quitEvent = True
+      }
+    ) lost
   return part
     { particlePosition = (nnx, nny)
     , particleTimeToLive = if (not $ null killings) then 0 else particleTimeToLive
@@ -320,31 +332,37 @@ shotsUpd sec part@Particle{..} = do
 
 haskelloidShotDown :: Haskelloid -> Affection UserData ()
 haskelloidShotDown h = do
-  liftIO $ traceIO "Haskelloid shot down"
+  -- liftIO $ traceIO "Haskelloid shot down"
   ud <- getAffection
   let redHaskelloids = delete h (haskelloids ud)
   newHaskelloids <- catMaybes <$> foldM
     (\acc _ ->
-      if hDiv h < 6
+      if hDiv h < 4
       then
         liftIO $ insertHaskelloid acc (Just $ hDiv h) $ hPos h
       else
         return $ Nothing : acc
       )
     (map Just redHaskelloids) ([0..1] :: [Int])
-  liftIO $ traceIO $ show $ length newHaskelloids
+  -- liftIO $ traceIO $ show $ length newHaskelloids
   liftIO $ gegl_node_link_many $ map hFlange newHaskelloids
+  if not $ null newHaskelloids
+  then 
+    liftIO $ gegl_node_link
+      (last $ map hFlange newHaskelloids)
+      (nodeGraph ud M.! KeyHNop)
+  else do
+    ad <- get
+    liftIO $ traceIO "YOU WON!"
+    put ad
+      { quitEvent = True
+      }
   putAffection ud
     { haskelloids = newHaskelloids
     }
 
 shotsDraw :: GeglBuffer -> GeglNode -> Particle -> Affection UserData ()
-shotsDraw _ _ _ = do
-  -- present
-  --   (GeglRectangle (floor $ fst particlePosition - 2) (floor $ snd particlePosition - 2) 4 4)
-  --   buf
-  --   False
-  return ()
+shotsDraw _ _ _ = return ()
 
 updateHaskelloid :: Double -> Haskelloid -> Affection UserData Haskelloid
 updateHaskelloid sec h@Haskelloid{..} = do
@@ -359,6 +377,22 @@ updateHaskelloid sec h@Haskelloid{..} = do
   liftIO $ gegl_node_set (hNodeGraph M.! "rot") $ Operation "gegl:rotate"
     [ Property "degrees" $ PropertyDouble newRot
     ]
+  ud <- getAffection
+  lost <- liftIO $ gegl_rectangle_intersect
+    (GeglRectangle (floor nnx) (floor nny) (100 `div` hDiv) (100 `div` hDiv))
+    (GeglRectangle
+      (floor $ fst $ sPos $ ship ud)
+      (floor $ snd $ sPos $ ship ud)
+      50
+      50
+      )
+  maybe (return ()) (\_ -> do
+    ad <- get
+    liftIO $ traceIO "YOU LOST!"
+    put ad
+      { quitEvent = True
+      }
+    ) lost
   return h
     { hPos = (nnx, nny)
     , hRot = newRot
@@ -366,14 +400,14 @@ updateHaskelloid sec h@Haskelloid{..} = do
 
 insertHaskelloid :: [Maybe Haskelloid] -> Maybe Int -> (Double, Double) -> IO [Maybe Haskelloid]
 insertHaskelloid hs split (px, py) = do
-  liftIO $ traceIO "inserting haskelloid"
+  -- liftIO $ traceIO "inserting haskelloid"
   vx <- liftIO $ randomRIO (-10, 10)
   vy <- liftIO $ randomRIO (-10, 10)
   rdiv <- case split of
     Nothing -> liftIO $ randomRIO (1, 2)
     Just x -> return $ x + 1
-  rot <- liftIO $ randomRIO (-2 * pi, 2 * pi)
-  pitch <- liftIO $ randomRIO (-2 * pi, 2 * pi)
+  rot <- liftIO $ randomRIO (0, 360)
+  pitch <- liftIO $ randomRIO (-45, 45)
   tempRoot <- liftIO $ gegl_node_new
   tempOver <- liftIO $ gegl_node_new_child tempRoot $ defaultOverOperation
   tempSvg <- gegl_node_new_child tempRoot $ Operation "gegl:svg-load"
