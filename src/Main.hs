@@ -6,9 +6,11 @@ import qualified SDL
 import GEGL
 import BABL
 
+import Data.List (delete)
 import qualified Data.Map as M
+import Data.Maybe (catMaybes)
 
-import Control.Monad (when)
+import Control.Monad (when, foldM)
 
 import System.Random (randomRIO)
 
@@ -77,50 +79,11 @@ load _ = do
     , (KeyShipOver, sover)
     , (KeySink, sink)
     ]
-  hs <- mapM (\_ -> do
+  hs <- catMaybes <$> foldM (\acc _ -> do
     px <- liftIO $ randomRIO (0, 800)
     py <- liftIO $ randomRIO (0, 600)
-    vx <- liftIO $ randomRIO (-10, 10)
-    vy <- liftIO $ randomRIO (-10, 10)
-    rdiv <- liftIO $ randomRIO (1, 2)
-    rot <- liftIO $ randomRIO (-2 * pi, 2 * pi)
-    pitch <- liftIO $ randomRIO (-2 * pi, 2 * pi)
-    tempRoot <- liftIO $ gegl_node_new
-    tempOver <- liftIO $ gegl_node_new_child tempRoot $ defaultOverOperation
-    tempSvg <- gegl_node_new_child root $ Operation "gegl:svg-load"
-      [ Property "path" $ PropertyString "assets/haskelloid.svg"
-      , Property "width" $ PropertyInt (100 `div` rdiv)
-      , Property "height" $ PropertyInt (100 `div` rdiv)
-      ]
-    tempTrans <- liftIO $ gegl_node_new_child tempRoot $ Operation "gegl:translate"
-      [ Property "x" $ PropertyDouble px
-      , Property "y" $ PropertyDouble py
-      , Property "sampler"  $ PropertyInt $ fromEnum GeglSamplerCubic
-      ]
-    tempRot <- liftIO $ gegl_node_new_child tempRoot $ Operation "gegl:rotate"
-      [ Property "origin-x" $ PropertyDouble (100 / 2 / fromIntegral rdiv)
-      , Property "origin-y" $ PropertyDouble (100 / 2 / fromIntegral rdiv)
-      , Property "degrees" $ PropertyDouble rot
-      , Property "sampler"  $ PropertyInt $ fromEnum GeglSamplerCubic
-      ]
-    liftIO $ gegl_node_link_many [tempSvg, tempRot, tempTrans]
-    _ <- liftIO $ gegl_node_connect_to tempTrans "output" tempOver "aux"
-    return Haskelloid
-      { hPos = (px, py)
-      , hVel = (vx, vy)
-      , hRot = rot
-      , hPitch = pitch
-      , hDiv = rdiv
-      , hFlange = tempOver
-      , hNodeGraph = M.fromList
-        [ ("root", tempRoot)
-        , ("over", tempOver)
-        , ("svg", tempSvg)
-        , ("trans", tempTrans)
-        , ("rot", tempRot)
-        ]
-      }
-    ) ([0..9] :: [Int])
+    insertHaskelloid acc Nothing (px, py)
+    ) [] ([0..9] :: [Int])
   liftIO $ gegl_node_link_many $ map hFlange hs
   liftIO $ gegl_node_link (last $ map hFlange hs) hnop
   return $ UserData
@@ -160,7 +123,7 @@ data Haskelloid = Haskelloid
   , hDiv :: Int
   , hFlange :: GeglNode
   , hNodeGraph :: M.Map String GeglNode
-  }
+  } deriving (Eq)
 
 data NodeKey
   = KeyRoot
@@ -176,7 +139,7 @@ data NodeKey
 
 update :: Double -> Affection UserData ()
 update sec = do
-  traceM $ (show $ 1 / sec) ++ " FPS"
+  -- traceM $ (show $ 1 / sec) ++ " FPS"
   ad <- get
   evs <- SDL.pollEvents
   mapM_ (\e ->
@@ -261,24 +224,29 @@ update sec = do
       _ -> return ()
     ) evs
   ud2 <- getAffection
-  let nx = fst (sPos $ ship ud2) + (fst (sVel $ ship ud2)) * sec
-      ny = snd (sPos $ ship ud2) + (snd (sVel $ ship ud2)) * sec
+  nhs <- mapM (updateHaskelloid sec) (haskelloids ud2)
+  liftIO $ traceIO $ show $ length nhs
+  putAffection ud2
+    { haskelloids = nhs
+    }
+  ud3 <- getAffection
+  let nx = fst (sPos $ ship ud3) + (fst (sVel $ ship ud3)) * sec
+      ny = snd (sPos $ ship ud3) + (snd (sVel $ ship ud3)) * sec
       (nnx, nny) = wrapAround (nx, ny) 50
-  liftIO $ gegl_node_set (nodeGraph ud2 M.! KeyTranslate) $ Operation "gegl:translate"
+  liftIO $ gegl_node_set (nodeGraph ud3 M.! KeyTranslate) $ Operation "gegl:translate"
     [ Property "x" $ PropertyDouble $ nnx
     , Property "y" $ PropertyDouble $ nny
     ]
-  liftIO $ gegl_node_set (nodeGraph ud2 M.! KeyRotate) $ Operation "gegl:rotate"
-    [ Property "degrees" $ PropertyDouble $ sRot $ ship ud2
+  liftIO $ gegl_node_set (nodeGraph ud3 M.! KeyRotate) $ Operation "gegl:rotate"
+    [ Property "degrees" $ PropertyDouble $ sRot $ ship ud3
     ]
-  ups <- updateParticleSystem (shots ud2) sec shotsUpd shotsDraw
-  nhs <- mapM (updateHaskelloid sec) (haskelloids ud2)
-  putAffection ud2
-    { ship = (ship ud2)
+  ups <- updateParticleSystem (shots ud3) sec shotsUpd shotsDraw
+  ud4 <- getAffection
+  putAffection ud4
+    { ship = (ship ud3)
       { sPos = (nnx, nny)
       }
     , shots = ups
-    , haskelloids = nhs
     }
 
 wrapAround :: (Ord t, Num t) => (t, t) -> t -> (t, t)
@@ -325,11 +293,49 @@ shotsUpd sec part@Particle{..} = do
       newY = (snd particlePosition) + sec * (fromIntegral $ snd particleVelocity)
       (nnx, nny) = wrapAround (newX, newY) 4
   liftIO $ gegl_node_set (particleNodeGraph M.! "rect") $ Operation "gegl:rectangle"
-    [ Property "x" $ PropertyDouble $ nnx - 2
-    , Property "y" $ PropertyDouble $ nny - 2
+    [ Property "x" $ PropertyDouble $ nnx
+    , Property "y" $ PropertyDouble $ nny
     ]
+  ud <- getAffection
+  inters <- catMaybes <$> mapM (\h -> do
+    col <- liftIO $ gegl_rectangle_intersect
+      (GeglRectangle (floor nnx) (floor nny) 4 4)
+      (GeglRectangle
+        (floor $ fst $ hPos h)
+        (floor $ snd $ hPos h)
+        (100 `div` hDiv h)
+        (100 `div` hDiv h)
+        )
+    case col of
+      Just _ -> return $ Just h
+      Nothing -> return Nothing
+    ) (haskelloids ud)
+  killings <- mapM haskelloidShotDown inters
+  ud2 <- getAffection
+  liftIO $ traceIO $ show $ length $ haskelloids ud2
   return part
     { particlePosition = (nnx, nny)
+    , particleTimeToLive = if (not $ null killings) then 0 else particleTimeToLive
+    }
+
+haskelloidShotDown :: Haskelloid -> Affection UserData ()
+haskelloidShotDown h = do
+  liftIO $ traceIO "Haskelloid shot down"
+  ud <- getAffection
+  let redHaskelloids = delete h (haskelloids ud)
+  newHaskelloids <- catMaybes <$> foldM
+    (\acc _ ->
+      if hDiv h < 6
+      then
+        liftIO $ insertHaskelloid acc (Just $ hDiv h) $ hPos h
+      else
+        return $ Nothing : acc
+      )
+    (map Just redHaskelloids) ([0..1] :: [Int])
+  liftIO $ traceIO $ show $ length newHaskelloids
+  liftIO $ gegl_node_link_many $ map hFlange newHaskelloids
+  putAffection ud
+    { haskelloids = newHaskelloids
     }
 
 shotsDraw :: GeglBuffer -> GeglNode -> Particle -> Affection UserData ()
@@ -357,3 +363,49 @@ updateHaskelloid sec h@Haskelloid{..} = do
     { hPos = (nnx, nny)
     , hRot = newRot
     }
+
+insertHaskelloid :: [Maybe Haskelloid] -> Maybe Int -> (Double, Double) -> IO [Maybe Haskelloid]
+insertHaskelloid hs split (px, py) = do
+  liftIO $ traceIO "inserting haskelloid"
+  vx <- liftIO $ randomRIO (-10, 10)
+  vy <- liftIO $ randomRIO (-10, 10)
+  rdiv <- case split of
+    Nothing -> liftIO $ randomRIO (1, 2)
+    Just x -> return $ x + 1
+  rot <- liftIO $ randomRIO (-2 * pi, 2 * pi)
+  pitch <- liftIO $ randomRIO (-2 * pi, 2 * pi)
+  tempRoot <- liftIO $ gegl_node_new
+  tempOver <- liftIO $ gegl_node_new_child tempRoot $ defaultOverOperation
+  tempSvg <- gegl_node_new_child tempRoot $ Operation "gegl:svg-load"
+    [ Property "path" $ PropertyString "assets/haskelloid.svg"
+    , Property "width" $ PropertyInt (100 `div` rdiv)
+    , Property "height" $ PropertyInt (100 `div` rdiv)
+    ]
+  tempTrans <- liftIO $ gegl_node_new_child tempRoot $ Operation "gegl:translate"
+    [ Property "x" $ PropertyDouble px
+    , Property "y" $ PropertyDouble py
+    , Property "sampler"  $ PropertyInt $ fromEnum GeglSamplerCubic
+    ]
+  tempRot <- liftIO $ gegl_node_new_child tempRoot $ Operation "gegl:rotate"
+    [ Property "origin-x" $ PropertyDouble (100 / 2 / fromIntegral rdiv)
+    , Property "origin-y" $ PropertyDouble (100 / 2 / fromIntegral rdiv)
+    , Property "degrees" $ PropertyDouble rot
+    , Property "sampler"  $ PropertyInt $ fromEnum GeglSamplerCubic
+    ]
+  liftIO $ gegl_node_link_many [tempSvg, tempRot, tempTrans]
+  _ <- liftIO $ gegl_node_connect_to tempTrans "output" tempOver "aux"
+  return $ Just  Haskelloid
+    { hPos = (px, py)
+    , hVel = (vx, vy)
+    , hRot = rot
+    , hPitch = pitch
+    , hDiv = rdiv
+    , hFlange = tempOver
+    , hNodeGraph = M.fromList
+      [ ("root", tempRoot)
+      , ("over", tempOver)
+      , ("svg", tempSvg)
+      , ("trans", tempTrans)
+      , ("rot", tempRot)
+      ]
+    } : hs
