@@ -33,6 +33,13 @@ load _ = do
   traceM "loading"
   root <- gegl_node_new
   traceM "root node"
+  bg <- gegl_node_new_child root $ Operation "gegl:rectangle"
+    [ Property "x" $ PropertyDouble 0
+    , Property "y" $ PropertyDouble 0
+    , Property "width" $ PropertyDouble 800
+    , Property "height" $ PropertyDouble 600
+    , Property "color" $ PropertyColor $ GEGL.RGBA 0 0 0.1 1
+    ]
   ship <- gegl_node_new_child root $ Operation "gegl:svg-load"
     [ Property "path" $ PropertyString "assets/ship.svg"
     , Property "width" $ PropertyInt 50
@@ -43,6 +50,7 @@ load _ = do
   sover <- gegl_node_new_child root $ defaultOverOperation
   hover <- gegl_node_new_child root $ defaultOverOperation
   pover <- gegl_node_new_child root $ defaultOverOperation
+  bgover <- gegl_node_new_child root $ defaultOverOperation
   translate <- gegl_node_new_child root $ Operation "gegl:translate"
     [ Property "x"        $ PropertyDouble 375
     , Property "y"        $ PropertyDouble 275
@@ -81,10 +89,11 @@ load _ = do
   --   [ Property "pattern" $ PropertyInt 8
   --   ]
   gegl_node_link_many [ship, rotate, translate]
-  gegl_node_link_many [pover, hover, sover, crop, pixelize, vignette, sink]
+  gegl_node_link_many [bgover, pover, hover, sover, crop, pixelize, vignette, sink]
   _ <- gegl_node_connect_to translate "output" sover "aux"
   _ <- gegl_node_connect_to pnop "output" pover "aux"
   _ <- gegl_node_connect_to hnop "output" hover "aux"
+  _ <- gegl_node_connect_to bg "output" bgover "aux"
   traceM "nodes complete"
   myMap <- return $ M.fromList
     [ (KeyRoot, root)
