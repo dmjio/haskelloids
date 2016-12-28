@@ -62,9 +62,9 @@ load _ = do
     ]
   gegl_node_link_many [ship, rotate, translate]
   gegl_node_link_many [pover, hover, sover, crop, sink]
-  gegl_node_connect_to translate "output" sover "aux"
-  gegl_node_connect_to pnop "output" pover "aux"
-  gegl_node_connect_to hnop "output" hover "aux"
+  _ <- gegl_node_connect_to translate "output" sover "aux"
+  _ <- gegl_node_connect_to pnop "output" pover "aux"
+  _ <- gegl_node_connect_to hnop "output" hover "aux"
   traceM "nodes complete"
   myMap <- return $ M.fromList
     [ (KeyRoot, root)
@@ -82,7 +82,7 @@ load _ = do
     py <- liftIO $ randomRIO (0, 600)
     vx <- liftIO $ randomRIO (-10, 10)
     vy <- liftIO $ randomRIO (-10, 10)
-    div <- liftIO $ randomRIO (1, 2)
+    rdiv <- liftIO $ randomRIO (1, 2)
     rot <- liftIO $ randomRIO (-2 * pi, 2 * pi)
     pitch <- liftIO $ randomRIO (-2 * pi, 2 * pi)
     tempRoot <- liftIO $ gegl_node_new
@@ -103,14 +103,14 @@ load _ = do
       , Property "degrees" $ PropertyDouble rot
       , Property "sampler"  $ PropertyInt $ fromEnum GeglSamplerCubic
       ]
-    liftIO $ gegl_node_link_many [tempText, tempRot, tempTrans]
-    liftIO $ gegl_node_connect_to tempTrans "output" tempOver "aux"
+    liftIO $ gegl_node_link_many [tempSvg, tempRot, tempTrans]
+    _ <- liftIO $ gegl_node_connect_to tempTrans "output" tempOver "aux"
     return Haskelloid
       { hPos = (px, py)
       , hVel = (vx, vy)
       , hRot = rot
       , hPitch = pitch
-      , hDiv = div
+      , hDiv = rdiv
       , hFlange = tempOver
       , hNodeGraph = M.fromList
         [ ("root", tempRoot)
@@ -202,8 +202,6 @@ update sec = do
            SDL.KeycodeUp ->
              when (SDL.keyboardEventKeyMotion dat == SDL.Pressed) $ do
                ud <- getAffection
-               -- let vx = -10 * (sin (toR $ 2 * (sRot $ ship ud))) + fst (sVel $ ship ud)
-               --     vy = -10 * (cos (toR $ 2 * (sRot $ ship ud))) + snd (sVel $ ship ud)
                let vx = -10 * (sin (toR $ (sRot $ ship ud))) + fst (sVel $ ship ud)
                    vy = -10 * (cos (toR $ (sRot $ ship ud))) + snd (sVel $ ship ud)
                putAffection ud
@@ -215,7 +213,7 @@ update sec = do
            SDL.KeycodeSpace ->
              when (SDL.keyboardEventKeyMotion dat == SDL.Pressed) $ do
                ud <- getAffection
-               ad <- get
+               -- ad <- get
                tempRoot <- liftIO $ gegl_node_new
                tempRect <- liftIO $ gegl_node_new_child tempRoot $ Operation "gegl:rectangle"
                  [ Property "x" $ (PropertyDouble $ (fst $ sPos $ ship ud) + 23)
@@ -225,7 +223,7 @@ update sec = do
                  , Property "color" $ PropertyColor $ (GEGL.RGBA 1 1 1 1)
                  ]
                tempOver <- liftIO $ gegl_node_new_child tempRoot $ defaultOverOperation
-               liftIO $ gegl_node_connect_to tempRect "output" tempOver "aux"
+               _ <- liftIO $ gegl_node_connect_to tempRect "output" tempOver "aux"
                ips <- insertParticle (shots ud) $
                  Particle
                    { particleTimeToLive = 5
@@ -283,6 +281,7 @@ update sec = do
     , haskelloids = nhs
     }
 
+wrapAround :: (Ord t, Num t) => (t, t) -> t -> (t, t)
 wrapAround (nx, ny) width = (nnx, nny)
   where
     nnx =
@@ -315,7 +314,7 @@ draw = do
     False
 
 clean :: UserData -> IO ()
-clean ud = return ()
+clean _ = return ()
 
 toR :: Double -> Double
 toR deg = deg * pi / 180
@@ -334,7 +333,7 @@ shotsUpd sec part@Particle{..} = do
     }
 
 shotsDraw :: GeglBuffer -> GeglNode -> Particle -> Affection UserData ()
-shotsDraw buf node Particle{..} = do
+shotsDraw _ _ _ = do
   -- present
   --   (GeglRectangle (floor $ fst particlePosition - 2) (floor $ snd particlePosition - 2) 4 4)
   --   buf
