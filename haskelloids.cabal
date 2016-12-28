@@ -50,6 +50,7 @@ cabal-version:       >=1.10
 executable haskelloids
   -- .hs or .lhs file containing the Main module.
   main-is:             Main.hs
+  ghc-options:         -Wall
   
   -- Modules included in this executable, other than Main.
   -- other-modules:       
