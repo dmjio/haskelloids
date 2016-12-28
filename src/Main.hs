@@ -202,14 +202,15 @@ update sec = do
   ud2 <- getAffection
   let nx = fst (sPos $ ship ud2) + (fst (sVel $ ship ud2)) * sec
       ny = snd (sPos $ ship ud2) + (snd (sVel $ ship ud2)) * sec
-      nnx =
-        if nx > 800
-        then nx - 850
-        else if nx < -50 then nx + 850 else nx
-      nny =
-        if ny > 600
-        then ny - 650
-        else if ny < -50 then ny + 650 else ny
+      -- nnx =
+      --   if nx > 800
+      --   then nx - 850
+      --   else if nx < -50 then nx + 850 else nx
+      -- nny =
+      --   if ny > 600
+      --   then ny - 650
+      --   else if ny < -50 then ny + 650 else ny
+      (nnx, nny) = wrapAround (nx, ny) 50
   liftIO $ gegl_node_set (nodeGraph ud2 M.! KeyTranslate) $ Operation "gegl:translate"
     [ Property "x" $ PropertyDouble $ nnx
     , Property "y" $ PropertyDouble $ nny
@@ -224,6 +225,17 @@ update sec = do
       }
     , shots = ups
     }
+
+wrapAround (nx, ny) width = (nnx, nny)
+  where
+    nnx =
+      if nx > 800
+      then nx - (800 + width)
+      else if nx < -width then nx + 800 + width else nx
+    nny =
+      if ny > 600
+      then ny - (600 + width)
+      else if ny < -width then ny + 600 + width else ny
 
 draw :: Affection UserData ()
 draw = do
