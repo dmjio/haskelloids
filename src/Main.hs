@@ -87,10 +87,10 @@ load _ = do
     pitch <- liftIO $ randomRIO (-2 * pi, 2 * pi)
     tempRoot <- liftIO $ gegl_node_new
     tempOver <- liftIO $ gegl_node_new_child tempRoot $ defaultOverOperation
-    tempText <- liftIO $ gegl_node_new_child tempRoot $ textOperation
-      [ Property "string" $ PropertyString "λ"
-      , Property "color" $ PropertyColor $ GEGL.RGBA 1 1 1 1
-      , Property "size"  $ PropertyDouble 100
+    tempSvg <- gegl_node_new_child root $ Operation "gegl:svg-load"
+      [ Property "path" $ PropertyString "assets/haskelloid.svg"
+      , Property "width" $ PropertyInt (100 `div` rdiv)
+      , Property "height" $ PropertyInt (100 `div` rdiv)
       ]
     tempTrans <- liftIO $ gegl_node_new_child tempRoot $ Operation "gegl:translate"
       [ Property "x" $ PropertyDouble px
@@ -98,8 +98,8 @@ load _ = do
       , Property "sampler"  $ PropertyInt $ fromEnum GeglSamplerCubic
       ]
     tempRot <- liftIO $ gegl_node_new_child tempRoot $ Operation "gegl:rotate"
-      [ Property "origin-x" $ PropertyDouble 50
-      , Property "origin-y" $ PropertyDouble 50
+      [ Property "origin-x" $ PropertyDouble (100 / 2 / fromIntegral rdiv)
+      , Property "origin-y" $ PropertyDouble (100 / 2 / fromIntegral rdiv)
       , Property "degrees" $ PropertyDouble rot
       , Property "sampler"  $ PropertyInt $ fromEnum GeglSamplerCubic
       ]
@@ -115,18 +115,18 @@ load _ = do
       , hNodeGraph = M.fromList
         [ ("root", tempRoot)
         , ("over", tempOver)
-        , ("text", tempText)
+        , ("svg", tempSvg)
         , ("trans", tempTrans)
         , ("rot", tempRot)
         ]
       }
-    ) [1..5]
+    ) ([0..9] :: [Int])
   liftIO $ gegl_node_link_many $ map hFlange hs
   liftIO $ gegl_node_link (last $ map hFlange hs) hnop
   return $ UserData
     { nodeGraph = myMap
     , ship      = Ship
-      { sPos = (400, 300)
+      { sPos = (375, 275)
       , sVel = (0, 0)
       , sRot = 0
       , sFlange = rotate
@@ -176,7 +176,7 @@ data NodeKey
 
 update :: Double -> Affection UserData ()
 update sec = do
-  -- traceM $ (show $ 1 / sec) ++ " FPS"
+  traceM $ (show $ 1 / sec) ++ " FPS"
   ad <- get
   evs <- SDL.pollEvents
   mapM_ (\e ->
@@ -209,7 +209,7 @@ update sec = do
                    { sVel = (vx, vy)
                    }
                  }
-               traceM $ show (vx, vy) ++ " " ++ show (sRot $ ship ud)
+               -- traceM $ show (vx, vy) ++ " " ++ show (sRot $ ship ud)
            SDL.KeycodeSpace ->
              when (SDL.keyboardEventKeyMotion dat == SDL.Pressed) $ do
                ud <- getAffection
@@ -345,10 +345,10 @@ updateHaskelloid sec h@Haskelloid{..} = do
   let newX = (fst $ hPos) + sec * (fst $ hVel)
       newY = (snd $ hPos) + sec * (snd $ hVel)
       newRot = hRot + hPitch * sec
-      (nnx, nny) = wrapAround (newX, newY) (50 / fromIntegral hDiv)
+      (nnx, nny) = wrapAround (newX, newY) (100 / fromIntegral hDiv)
   liftIO $ gegl_node_set (hNodeGraph M.! "trans") $ Operation "gegl:translate"
-    [ Property "x" $ PropertyDouble $ nnx - (50 / fromIntegral hDiv)
-    , Property "y" $ PropertyDouble $ nny - (50 / fromIntegral hDiv)
+    [ Property "x" $ PropertyDouble $ nnx
+    , Property "y" $ PropertyDouble $ nny
     ]
   liftIO $ gegl_node_set (hNodeGraph M.! "rot") $ Operation "gegl:rotate"
     [ Property "degrees" $ PropertyDouble newRot
