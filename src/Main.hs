@@ -47,6 +47,7 @@ load _ = do
     ]
   pnop <- gegl_node_new_child root $ Operation "gegl:nop" []
   hnop <- gegl_node_new_child root $ Operation "gegl:nop" []
+  fgnop <- gegl_node_new_child root $ Operation "gegl:nop" []
   sover <- gegl_node_new_child root $ defaultOverOperation
   hover <- gegl_node_new_child root $ defaultOverOperation
   pover <- gegl_node_new_child root $ defaultOverOperation
@@ -95,6 +96,7 @@ load _ = do
   _ <- gegl_node_connect_to pnop "output" pover "aux"
   _ <- gegl_node_connect_to hnop "output" hover "aux"
   _ <- gegl_node_connect_to bg "output" bgover "aux"
+  _ <- gegl_node_connect_to fgnop "output" fgover "aux"
   traceM "nodes complete"
   myMap <- return $ M.fromList
     [ (KeyRoot, root)
@@ -110,6 +112,7 @@ load _ = do
     , (KeyLost, lost)
     , (KeyPixelize, pixelize)
     , (KeyFGOver, fgover)
+    , (KeyFGNop, fgnop)
     ]
   hs <- catMaybes <$> foldM (\acc _ -> do
     px <- liftIO $ randomRIO (0, 800)
@@ -175,6 +178,7 @@ data NodeKey
   | KeyLost
   | KeyPixelize
   | KeyFGOver
+  | KeyFGNop
   deriving (Ord, Eq)
 
 update :: Double -> Affection UserData ()
@@ -333,7 +337,8 @@ draw = do
   present
     (GeglRectangle 0 0 800 600)
     (buffer ud)
-    (not $ wonlost ud)
+    -- (not $ wonlost ud)
+    True
 
 clean :: UserData -> IO ()
 clean ud = gegl_node_drop $ nodeGraph ud M.! KeyRoot
@@ -387,6 +392,24 @@ haskelloidShotDown h = do
   liftIO $ gegl_node_drop $ hNodeGraph h M.! "root"
   ud <- getAffection
   let redHaskelloids = delete h (haskelloids ud)
+  -- mproducer <- liftIO $ gegl_node_get_producer
+  --   (hFlange h)
+  --   "input"
+  -- case mproducer of
+  --   Just (prod, padname) -> do
+  --     consumers <- liftIO $ gegl_node_get_consumers
+  --       (hFlange h)
+  --       "output"
+  --     liftIO $ mapM_ (\(node, inpad) -> do
+  --       traceIO "klink"
+  --       gegl_node_connect_to
+  --         prod
+  --         padname
+  --         node
+  --         inpad
+  --         ) consumers
+  --   Nothing -> return ()
+  liftIO $ gegl_node_drop $ hNodeGraph h M.! "root"
   newHaskelloids <- catMaybes <$> foldM
     (\acc _ ->
       if hDiv h < 4
@@ -451,7 +474,7 @@ updateHaskelloid sec h@Haskelloid{..} = do
     }
 
 insertHaskelloid :: [Maybe Haskelloid] -> Maybe Int -> (Double, Double) -> IO [Maybe Haskelloid]
-insertHaskelloid hs split (px, py) = do
+insertHaskelloid hasks split (px, py) = do
   -- liftIO $ traceIO "inserting haskelloid"
   vx <- liftIO $ randomRIO (-10, 10)
   vy <- liftIO $ randomRIO (-10, 10)
@@ -494,18 +517,17 @@ insertHaskelloid hs split (px, py) = do
       , ("trans", tempTrans)
       , ("rot", tempRot)
       ]
-    } : hs
+    } : hasks
 
 lose :: Affection UserData ()
 lose = do
   ud <- getAffection
   liftIO $ traceIO "YOU LOST!"
-  _ <- liftIO $ gegl_node_connect_to
+  _ <- liftIO $ gegl_node_link
     (nodeGraph ud M.! KeyLost)
-    "output"
-    (nodeGraph ud M.! KeyFGOver)
-    "aux"
+    (nodeGraph ud M.! KeyFGNop)
   putAffection ud
     { wonlost = True
     }
-  liftIO $ gegl_node_drop $ nodeGraph ud M.! KeyShip
+  _ <- liftIO $ gegl_node_disconnect (nodeGraph ud M.! KeyShipOver) "aux"
+  return ()
