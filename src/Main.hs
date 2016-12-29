@@ -130,6 +130,7 @@ load _ = do
     , shots = ParticleSystem (ParticleStorage Nothing []) pnop buffer
     , haskelloids = hs
     , wonlost = False
+    , pixelSize = 3
     }
 
 data UserData = UserData
@@ -140,6 +141,7 @@ data UserData = UserData
   , shots :: ParticleSystem
   -- , debris :: ParticleSystem
   , wonlost :: Bool
+  , pixelSize :: Int
   }
 
 data Ship = Ship
@@ -181,6 +183,15 @@ update sec = do
   ad <- get
   evs <- SDL.pollEvents
   wd <- getAffection
+  when (((floor $ elapsedTime ad) * 100) `mod` 10 < 2 && pixelSize wd > 3) $ do
+    liftIO $ gegl_node_set (nodeGraph wd M.! KeyPixelize) $ Operation "gegl:pixelize"
+      [ Property "size-x" $ PropertyInt $ pixelSize wd - 1
+      , Property "size-y" $ PropertyInt $ pixelSize wd - 1
+      ]
+    pd <- getAffection
+    putAffection pd
+      { pixelSize = pixelSize wd -1
+      }
   mapM_ (\e ->
     case SDL.eventPayload e of
       SDL.KeyboardEvent dat ->
@@ -215,6 +226,10 @@ update sec = do
            SDL.KeycodeSpace ->
              when (SDL.keyboardEventKeyMotion dat == SDL.Pressed && not (wonlost wd)) $ do
                ud <- getAffection
+               liftIO $ gegl_node_set (nodeGraph ud M.! KeyPixelize) $ Operation "gegl:pixelize"
+                 [ Property "size-x" $ PropertyInt 8
+                 , Property "size-y" $ PropertyInt 8
+                 ]
                -- ad <- get
                let posX = (fst $ sPos $ ship ud) + 23 - 30 * sin (toR $ sRot $ ship ud)
                    posY = (snd $ sPos $ ship ud) + 23 - 30 * cos (toR $ sRot $ ship ud)
@@ -252,6 +267,7 @@ update sec = do
                    }
                putAffection $ ud
                  { shots = ips
+                 , pixelSize = 8
                  }
            _ -> return ()
       SDL.WindowClosedEvent _ -> do
