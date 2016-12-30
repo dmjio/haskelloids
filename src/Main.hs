@@ -498,8 +498,8 @@ insertHaskelloid hasks split (px, py) = do
     , Property "height" $ PropertyInt (100 `div` rdiv)
     ]
   tempTrans <- liftIO $ gegl_node_new_child tempRoot $ Operation "gegl:translate"
-    [ Property "x" $ PropertyDouble px
-    , Property "y" $ PropertyDouble py
+    [ Property "x" $ PropertyDouble $ px + (100 / fromIntegral rdiv / 2)
+    , Property "y" $ PropertyDouble $ py + (100 / fromIntegral rdiv / 2)
     , Property "sampler"  $ PropertyInt $ fromEnum GeglSamplerCubic
     ]
   tempRot <- liftIO $ gegl_node_new_child tempRoot $ Operation "gegl:rotate"
@@ -511,7 +511,10 @@ insertHaskelloid hasks split (px, py) = do
   liftIO $ gegl_node_link_many [tempSvg, tempRot, tempTrans]
   _ <- liftIO $ gegl_node_connect_to tempTrans "output" tempOver "aux"
   return $ Just  Haskelloid
-    { hPos = (px, py)
+    { hPos =
+      ( px + (100 / 2 / fromIntegral rdiv)
+      , py + (100 / 2 / fromIntegral rdiv)
+      )
     , hVel = (vx, vy)
     , hRot = rot
     , hPitch = pitch
