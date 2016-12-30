@@ -378,7 +378,8 @@ shotsUpd sec part@Particle{..} = do
       Just _ -> return $ Just h
       Nothing -> return Nothing
     ) (haskelloids ud)
-  killings <- mapM haskelloidShotDown inters
+  when (not $ null inters) $
+    haskelloidShotDown $ head inters
   lost <- liftIO $ gegl_rectangle_intersect
     (GeglRectangle (floor nnx) (floor nny) 4 4)
     (GeglRectangle
@@ -392,7 +393,7 @@ shotsUpd sec part@Particle{..} = do
     ) lost
   return part
     { particlePosition = (nnx, nny)
-    , particleTimeToLive = if (not $ null killings) then 0 else particleTimeToLive
+    , particleTimeToLive = if (not $ null inters) then 0 else particleTimeToLive
     }
 
 haskelloidShotDown :: Haskelloid -> Affection UserData ()
