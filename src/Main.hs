@@ -58,6 +58,11 @@ load _ = do
     , Property "y"        $ PropertyDouble 275
     , Property "sampler"  $ PropertyInt $ fromEnum GeglSamplerCubic
     ]
+  fgtranslate <- gegl_node_new_child root $ Operation "gegl:translate"
+    [ Property "x"        $ PropertyDouble 150
+    , Property "y"        $ PropertyDouble 250
+    , Property "sampler"  $ PropertyInt $ fromEnum GeglSamplerCubic
+    ]
   rotate <- gegl_node_new_child root $ Operation "gegl:rotate"
     [ Property "origin-x" $ PropertyDouble 25
     , Property "origin-y" $ PropertyDouble 25
@@ -74,15 +79,18 @@ load _ = do
     ]
   won <- gegl_node_new_child root $ textOperation
     [ Property "string" $ PropertyString "YOU WON!"
+    , Property "font"   $ PropertyString "Modulo"
     , Property "size"   $ PropertyDouble 100
     , Property "color"  $ PropertyColor $ GEGL.RGBA 1 1 1 1
     ]
   lost <- gegl_node_new_child root $ textOperation
     [ Property "string" $ PropertyString "YOU LOST!"
+    , Property "font"   $ PropertyString "Modulo"
     , Property "size"   $ PropertyDouble 100
     , Property "color"  $ PropertyColor $ GEGL.RGBA 1 1 1 1
     ]
   vignette <- gegl_node_new_child root $ Operation "gegl:vignette" []
+  -- pixelize <- gegl_node_new_child root $ Operation "gegl:pixelize"
   pixelize <- gegl_node_new_child root $ Operation "gegl:pixelize"
     [ Property "size-x" $ PropertyInt 3
     , Property "size-y" $ PropertyInt 3
@@ -96,7 +104,8 @@ load _ = do
   _ <- gegl_node_connect_to pnop "output" pover "aux"
   _ <- gegl_node_connect_to hnop "output" hover "aux"
   _ <- gegl_node_connect_to bg "output" bgover "aux"
-  _ <- gegl_node_connect_to fgnop "output" fgover "aux"
+  liftIO $ gegl_node_link fgnop fgtranslate
+  _ <- gegl_node_connect_to fgtranslate "output" fgover "aux"
   traceM "nodes complete"
   myMap <- return $ M.fromList
     [ (KeyRoot, root)
@@ -187,7 +196,7 @@ update sec = do
   ad <- get
   evs <- SDL.pollEvents
   wd <- getAffection
-  when (((floor $ elapsedTime ad) * 100) `mod` 10 < 2 && pixelSize wd > 3) $ do
+  when (((floor $ elapsedTime ad :: Int) * 100) `mod` 10 < 2 && pixelSize wd > 3) $ do
     liftIO $ gegl_node_set (nodeGraph wd M.! KeyPixelize) $ Operation "gegl:pixelize"
       [ Property "size-x" $ PropertyInt $ pixelSize wd - 1
       , Property "size-y" $ PropertyInt $ pixelSize wd - 1
@@ -205,7 +214,7 @@ update sec = do
              when (SDL.keyboardEventKeyMotion dat == SDL.Pressed && not (wonlost wd)) $
                putAffection ud
                  { ship = (ship ud)
-                   { sRot = (sRot $ ship ud) + 180 * sec
+                   { sRot = (sRot $ ship ud) + 270 * sec
                    }
                  }
            SDL.KeycodeRight -> do
@@ -213,7 +222,7 @@ update sec = do
              when (SDL.keyboardEventKeyMotion dat == SDL.Pressed) $
                putAffection ud
                  { ship = (ship ud)
-                   { sRot = (sRot $ ship ud) - 180 * sec
+                   { sRot = (sRot $ ship ud) - 270 * sec
                    }
                  }
            SDL.KeycodeUp ->
@@ -235,8 +244,8 @@ update sec = do
                  , Property "size-y" $ PropertyInt 8
                  ]
                -- ad <- get
-               let posX = (fst $ sPos $ ship ud) + 23 - 30 * sin (toR $ sRot $ ship ud)
-                   posY = (snd $ sPos $ ship ud) + 23 - 30 * cos (toR $ sRot $ ship ud)
+               let posX = (fst $ sPos $ ship ud) + 23 - 35 * sin (toR $ sRot $ ship ud)
+                   posY = (snd $ sPos $ ship ud) + 23 - 35 * cos (toR $ sRot $ ship ud)
                tempRoot <- liftIO $ gegl_node_new
                tempRect <- liftIO $ gegl_node_new_child tempRoot $ Operation "gegl:rectangle"
                  [ Property "x" $ PropertyDouble $ posX
@@ -428,11 +437,9 @@ haskelloidShotDown h = do
       (nodeGraph ud M.! KeyHNop)
   else do
     liftIO $ traceIO "YOU WON!"
-    _ <- liftIO $ gegl_node_connect_to
+    liftIO $ gegl_node_link
       (nodeGraph ud M.! KeyWon)
-      "output"
-      (nodeGraph ud M.! KeyFGOver)
-      "aux"
+      (nodeGraph ud M.! KeyFGNop)
     putAffection ud
       { wonlost = True
       }
