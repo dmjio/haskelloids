@@ -94,14 +94,42 @@ load _ = do
   -- vdeg <- gegl_node_new_child root $ Operation "gegl:video-degradation"
   --   [ Property "pattern" $ PropertyInt 8
   --   ]
+  menuHeading <- gegl_node_new_child root $ textOperation
+    [ Property "string" $ PropertyString "Haskelloids"
+    , Property "font"   $ PropertyString "Modulo"
+    , Property "size"   $ PropertyDouble 100
+    , Property "color"  $ PropertyColor $ GEGL.RGBA 1 1 1 1
+    ]
+  menuText <- gegl_node_new_child root $ textOperation
+    [ Property "string" $ PropertyString "Press [Space] to start\nPress [H] for Highscore"
+    , Property "font"   $ PropertyString "Modulo"
+    , Property "size"   $ PropertyDouble 50
+    , Property "alignment" $ PropertyInt 1
+    , Property "color"  $ PropertyColor $ GEGL.RGBA 1 1 1 1
+    ]
+  menuTranslateHeading <- gegl_node_new_child root $ Operation "gegl:translate"
+    [ Property "x" $ PropertyDouble 150
+    , Property "y" $ PropertyDouble 100
+    , Property "sampler" $ PropertyInt $ fromEnum GeglSamplerCubic
+    ]
+  menuTranslateText <- gegl_node_new_child root $ Operation "gegl:translate"
+    [ Property "x" $ PropertyDouble 130
+    , Property "y" $ PropertyDouble 300
+    , Property "sampler" $ PropertyInt $ fromEnum GeglSamplerCubic
+    ]
+  menuOver <- gegl_node_new_child root $ defaultOverOperation
+  gegl_node_link menuHeading menuTranslateHeading
+  gegl_node_link_many [menuText, menuTranslateText, menuOver]
+  gegl_node_connect_to menuTranslateHeading "output" menuOver "aux"
   gegl_node_link_many [ship, rotate, translate]
   gegl_node_link_many [bgover, pover, hover, sover, crop, fgover, pixelize, vignette, sink]
-  _ <- gegl_node_connect_to translate "output" sover "aux"
+  -- _ <- gegl_node_connect_to translate "output" sover "aux"
   _ <- gegl_node_connect_to pnop "output" pover "aux"
   _ <- gegl_node_connect_to hnop "output" hover "aux"
   _ <- gegl_node_connect_to bg "output" bgover "aux"
-  liftIO $ gegl_node_link fgnop fgtranslate
-  _ <- gegl_node_connect_to fgtranslate "output" fgover "aux"
+  -- liftIO $ gegl_node_link fgnop fgtranslate
+  -- _ <- gegl_node_connect_to fgtranslate "output" fgover "aux"
+  _ <- gegl_node_connect_to fgnop "output" fgover "aux"
   traceM "nodes complete"
   myMap <- return $ M.fromList
     [ (KeyRoot, root)
@@ -118,15 +146,18 @@ load _ = do
     , (KeyPixelize, pixelize)
     , (KeyFGOver, fgover)
     , (KeyFGNop, fgnop)
+    , (KeyMenuHeading, menuTranslateHeading)
+    , (KeyMenuText, menuText)
+    , (KeyMenuOver, menuOver)
     ]
-  hs <- catMaybes <$> foldM (\acc _ -> do
-    px <- liftIO $ randomRIO (0, 800)
-    py <- liftIO $ randomRIO (0, 600)
-    insertHaskelloid acc Nothing (px, py)
-    ) [] ([0..9] :: [Int])
-  liftIO $ gegl_node_link_many $ map hFlange hs
-  liftIO $ gegl_node_link (last $ map hFlange hs) hnop
-  return $ UserData
+  -- hs <- catMaybes <$> foldM (\acc _ -> do
+  --   px <- liftIO $ randomRIO (0, 800)
+  --   py <- liftIO $ randomRIO (0, 600)
+  --   insertHaskelloid acc Nothing (px, py)
+  --   ) [] ([0..9] :: [Int])
+  -- liftIO $ gegl_node_link_many $ map hFlange hs
+  -- liftIO $ gegl_node_link (last $ map hFlange hs) hnop
+  loadMenu $ UserData
     { nodeGraph = myMap
     , ship      = Ship
       { sPos = (375, 275)
@@ -136,10 +167,26 @@ load _ = do
       }
     , buffer = buffer
     , shots = ParticleSystem (ParticleStorage Nothing []) pnop buffer
-    , haskelloids = hs
+    -- , haskelloids = hs
+    , haskelloids = []
     , wonlost = False
     , pixelSize = 3
-    , state = InGame
+    , state = Menu
+    }
+
+loadMenu :: UserData -> IO UserData
+loadMenu ud = do
+  gegl_node_link (nodeGraph ud M.! KeyMenuOver) (nodeGraph ud M.! KeyFGNop)
+  hs <- catMaybes <$> foldM (\acc _ -> do
+    px <- randomRIO (0, 800)
+    py <- randomRIO (0, 600)
+    insertHaskelloid acc Nothing (px, py)
+    ) [] ([0..9] :: [Int])
+  liftIO $ gegl_node_link_many $ map hFlange hs
+  liftIO $ gegl_node_link (last $ map hFlange hs) (nodeGraph ud M.! KeyHNop)
+  return ud
+    { haskelloids = hs
+    , fade = FadeIn 1
     }
 
 insertHaskelloid :: [Maybe Haskelloid] -> Maybe Int -> (Double, Double) -> IO [Maybe Haskelloid]

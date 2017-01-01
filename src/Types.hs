@@ -16,6 +16,7 @@ data UserData = UserData
   , wonlost :: Bool
   , pixelSize :: Int
   , state :: StateMachine
+  , fade :: MenuFade
   }
 
 data Ship = Ship
@@ -50,9 +51,18 @@ data NodeKey
   | KeyPixelize
   | KeyFGOver
   | KeyFGNop
+  | KeyMenuHeading
+  | KeyMenuText
+  | KeyMenuStart
+  | KeyMenuHighscore
+  | KeyMenuOver
   deriving (Ord, Eq)
 
 data StateMachine
   = Menu
   | HighScore
   | InGame
+
+data MenuFade
+  = FadeIn Double
+  | FadeOut Double

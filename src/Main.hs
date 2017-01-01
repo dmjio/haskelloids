@@ -16,8 +16,10 @@ import Debug.Trace
 -- internal imports
 
 import Types
-import InGame
 import Commons
+
+import Menu
+import InGame
 
 main :: IO ()
 main = withAffection $ AffectionConfig
@@ -45,9 +47,15 @@ update sec = do
     putAffection pd
       { pixelSize = pixelSize wd -1
       }
+  case state wd of
+    Menu ->
+      updateMenu sec
+    _    -> return ()
   evs <- SDL.pollEvents
   mapM_ (\e ->
     case state wd of
+      Menu ->
+        handleMenuEvent sec e
       InGame ->
         handleGameEvent sec e
       _ -> error "not yet implemented"
@@ -200,14 +208,17 @@ updateHaskelloid sec h@Haskelloid{..} = do
     [ Property "degrees" $ PropertyDouble newRot
     ]
   ud <- getAffection
-  lost <- liftIO $ gegl_rectangle_intersect
-    (GeglRectangle (floor nnx) (floor nny) (100 `div` hDiv) (100 `div` hDiv))
-    (GeglRectangle
-      (floor $ fst $ sPos $ ship ud)
-      (floor $ snd $ sPos $ ship ud)
-      50
-      50
-      )
+  lost <- 
+    case state ud of
+      InGame -> liftIO $ gegl_rectangle_intersect
+        (GeglRectangle (floor nnx) (floor nny) (100 `div` hDiv) (100 `div` hDiv))
+        (GeglRectangle
+          (floor $ fst $ sPos $ ship ud)
+          (floor $ snd $ sPos $ ship ud)
+          50
+          50
+          )
+      _ -> return Nothing
   maybe (return ()) (\_ ->
     lose
     ) lost
