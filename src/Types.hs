@@ -3,6 +3,7 @@
 module Types where
 
 import Affection
+import qualified SDL
 import GEGL
 import qualified Data.Map as M
 
@@ -62,16 +63,6 @@ data State
   = Menu
   | HighScore
   | InGame
-
-class StateMachine a us where
-  smLoad   :: a -> Affection us ()
-  smUpdate :: a -> Double -> Affection us ()
-  smDraw   :: a -> Affection us ()
-  smClean  :: a -> Affection us ()
-
--- instance StateMachine State UserData where
---   update Menu = return ()
-  
 
 data MenuFade
   = FadeIn Double

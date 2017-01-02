@@ -17,7 +17,7 @@ import Debug.Trace
 
 import Types
 import Commons
-import Transitions
+import StateMachine
 
 import Menu
 import InGame
@@ -57,14 +57,15 @@ update sec = do
   --   _    -> return ()
   smUpdate (state wd) sec
   evs <- SDL.pollEvents
-  mapM_ (\e ->
-    case state wd of
-      Menu ->
-        handleMenuEvent sec e
-      InGame ->
-        handleGameEvent sec e
-      _ -> error "not yet implemented"
-    ) evs
+  -- mapM_ (\e ->
+  --   case state wd of
+  --     Menu ->
+  --       handleMenuEvent sec e
+  --     InGame ->
+  --       handleGameEvent sec e
+  --     _ -> error "not yet implemented"
+  --   ) evs
+  mapM_ (smEvent (state wd) sec) evs
   ud2 <- getAffection
   nhs <- mapM (updateHaskelloid sec) (haskelloids ud2)
   -- liftIO $ traceIO $ show $ length nhs
@@ -91,9 +92,6 @@ update sec = do
     , shots = ups
     }
 
-transition :: Affection us ()
-transition = return ()
-
 wrapAround :: (Ord t, Num t) => (t, t) -> t -> (t, t)
 wrapAround (nx, ny) width = (nnx, nny)
   where
@@ -109,21 +107,7 @@ wrapAround (nx, ny) width = (nnx, nny)
 draw :: Affection UserData ()
 draw = do
   ud <- getAffection
-  liftIO $ gegl_node_process $ nodeGraph ud M.! KeySink
-  -- mintr <- liftIO $ gegl_rectangle_intersect
-  --   (GeglRectangle 0 0 800 600)
-  --   (GeglRectangle (floor $ fst $ sPos $ ship ud) (floor $ snd $ sPos $ ship ud) 50 50)
-  -- maybe (return ()) (\intr ->
-  --   present
-  --     (GeglRectangle (floor $ fst $ sPos $ ship ud) (floor $ snd $ sPos $ ship ud) 50 50)
-  --     (buffer ud)
-  --     False
-  --   ) mintr
-  -- XXX: above part crashes regularly for no apparent reason
-  present
-    (GeglRectangle 0 0 800 600)
-    (buffer ud)
-    True
+  smDraw $ state ud
 
 shotsUpd :: Double -> Particle -> Affection UserData Particle
 shotsUpd sec part@Particle{..} = do
