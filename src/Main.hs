@@ -17,6 +17,7 @@ import Debug.Trace
 
 import Types
 import Commons
+import Transitions
 
 import Menu
 import InGame
@@ -26,12 +27,15 @@ main = withAffection $ AffectionConfig
   { initComponents = All
   , windowTitle    = "Haskelloids"
   , windowConfig   = defaultWindow
-  , preLoop        = transition
+  , preLoop        = pre
   , drawLoop       = draw
   , updateLoop     = update
   , loadState      = load
   , cleanUp        = clean
   }
+
+pre :: Affection UserData ()
+pre = smLoad Menu
 
 update :: Double -> Affection UserData ()
 update sec = do
@@ -47,10 +51,11 @@ update sec = do
     putAffection pd
       { pixelSize = pixelSize wd -1
       }
-  case state wd of
-    Menu ->
-      updateMenu sec
-    _    -> return ()
+  -- case state wd of
+  --   Menu ->
+  --     updateMenu sec
+  --   _    -> return ()
+  smUpdate (state wd) sec
   evs <- SDL.pollEvents
   mapM_ (\e ->
     case state wd of

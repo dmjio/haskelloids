@@ -66,13 +66,13 @@ data State
   | InGame
 
 class StateMachine a us where
-  load   :: a -> Affection us ()
-  update :: a -> Affection us ()
-  draw   :: a -> Affection us ()
-  clean  :: a -> Affection us ()
+  smLoad   :: a -> Affection us ()
+  smUpdate :: a -> Double -> Affection us ()
+  smDraw   :: a -> Affection us ()
+  smClean  :: a -> Affection us ()
 
-instance StateMachine State UserData where
-  update Menu = return ()
+-- instance StateMachine State UserData where
+--   update Menu = return ()
   
 
 data MenuFade

@@ -157,7 +157,7 @@ load _ = do
   --   ) [] ([0..9] :: [Int])
   -- liftIO $ gegl_node_link_many $ map hFlange hs
   -- liftIO $ gegl_node_link (last $ map hFlange hs) hnop
-  loadMenu $ UserData
+  return $ UserData
     { nodeGraph = myMap
     , ship      = Ship
       { sPos = (375, 275)
