@@ -26,7 +26,7 @@ main = withAffection $ AffectionConfig
   { initComponents = All
   , windowTitle    = "Haskelloids"
   , windowConfig   = defaultWindow
-  , preLoop        = return ()
+  , preLoop        = transition
   , drawLoop       = draw
   , updateLoop     = update
   , loadState      = load
@@ -85,6 +85,9 @@ update sec = do
       }
     , shots = ups
     }
+
+transition :: Affection us ()
+transition = return ()
 
 wrapAround :: (Ord t, Num t) => (t, t) -> t -> (t, t)
 wrapAround (nx, ny) width = (nnx, nny)

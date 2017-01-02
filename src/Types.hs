@@ -1,3 +1,5 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
+
 module Types where
 
 import Affection
@@ -15,7 +17,7 @@ data UserData = UserData
   -- , debris :: ParticleSystem
   , wonlost :: Bool
   , pixelSize :: Int
-  , state :: StateMachine
+  , state :: State
   , fade :: MenuFade
   }
 
@@ -58,10 +60,20 @@ data NodeKey
   | KeyMenuOver
   deriving (Ord, Eq)
 
-data StateMachine
+data State
   = Menu
   | HighScore
   | InGame
+
+class StateMachine a us where
+  load   :: a -> Affection us ()
+  update :: a -> Affection us ()
+  draw   :: a -> Affection us ()
+  clean  :: a -> Affection us ()
+
+instance StateMachine State UserData where
+  update Menu = return ()
+  
 
 data MenuFade
   = FadeIn Double
