@@ -6,7 +6,6 @@ import GEGL
 import BABL
 
 import qualified Data.Map as M
-import Data.Maybe (catMaybes)
 
 import Control.Monad (foldM)
 
@@ -36,7 +35,7 @@ load _ = do
     , Property "height" $ PropertyDouble 600
     , Property "color" $ PropertyColor $ GEGL.RGBA 0 0 0.1 1
     ]
-  ship <- gegl_node_new_child root $ Operation "gegl:svg-load"
+  shipNode <- gegl_node_new_child root $ Operation "gegl:svg-load"
     [ Property "path" $ PropertyString "assets/ship.svg"
     , Property "width" $ PropertyInt 50
     , Property "height" $ PropertyInt 50
@@ -68,10 +67,10 @@ load _ = do
     [ Property "width" $ PropertyDouble 800
     , Property "height" $ PropertyDouble 600
     ]
-  buffer <- gegl_buffer_new (Just $ GeglRectangle 0 0 800 600) =<<
+  nbuffer <- gegl_buffer_new (Just $ GeglRectangle 0 0 800 600) =<<
     babl_format (PixelFormat BABL.RGBA CFfloat)
   sink <- gegl_node_new_child root $ Operation "gegl:copy-buffer"
-    [ Property "buffer" $ PropertyBuffer buffer
+    [ Property "buffer" $ PropertyBuffer nbuffer
     ]
   won <- gegl_node_new_child root $ textOperation
     [ Property "string" $ PropertyString "YOU WON!"
@@ -120,8 +119,8 @@ load _ = do
   menuOver <- gegl_node_new_child root $ defaultOverOperation
   gegl_node_link menuHeading menuTranslateHeading
   gegl_node_link_many [menuText, menuTranslateText, menuOver]
-  gegl_node_connect_to menuTranslateHeading "output" menuOver "aux"
-  gegl_node_link_many [ship, rotate, translate]
+  _ <- gegl_node_connect_to menuTranslateHeading "output" menuOver "aux"
+  gegl_node_link_many [shipNode, rotate, translate]
   gegl_node_link_many [bgover, pover, hover, sover, crop, fgover, pixelize, vignette, sink]
   -- _ <- gegl_node_connect_to translate "output" sover "aux"
   _ <- gegl_node_connect_to pnop "output" pover "aux"
@@ -135,7 +134,7 @@ load _ = do
     [ (KeyRoot, root)
     , (KeyTranslate, translate)
     , (KeyRotate, rotate)
-    , (KeyShip, ship)
+    , (KeyShip, shipNode)
     , (KeyPNop, pnop)
     , (KeyHNop, hnop)
     , (KeyCrop, crop)
@@ -165,13 +164,14 @@ load _ = do
       , sRot = 0
       , sFlange = rotate
       }
-    , buffer = buffer
-    , shots = ParticleSystem (ParticleStorage Nothing []) pnop buffer
+    , buffer = nbuffer
+    , shots = ParticleSystem (ParticleStorage Nothing []) pnop nbuffer
     -- , haskelloids = hs
     , haskelloids = []
     , wonlost = False
     , pixelSize = 3
     , state = Menu
+    , fade = FadeIn 1
     }
 
 insertHaskelloid :: [Maybe Haskelloid] -> Maybe Int -> (Double, Double) -> IO [Maybe Haskelloid]

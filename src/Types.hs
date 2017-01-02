@@ -3,9 +3,7 @@
 module Types where
 
 import Affection
-import qualified SDL
 import GEGL
-import BABL
 import qualified Data.Map as M
 
 data UserData = UserData
