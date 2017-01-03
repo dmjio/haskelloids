@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, RecordWildCards #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Main where
 
 import Affection
@@ -23,7 +23,7 @@ import Menu
 import InGame
 
 main :: IO ()
-main = withAffection $ AffectionConfig
+main = withAffection AffectionConfig
   { initComponents = All
   , windowTitle    = "Haskelloids"
   , windowConfig   = defaultWindow

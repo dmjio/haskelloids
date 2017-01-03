@@ -11,7 +11,7 @@ import qualified Data.Map as M
 import Data.List (delete)
 import Data.Maybe (catMaybes)
 
-import Control.Monad (foldM, when)
+import Control.Monad (foldM, unless)
 
 import System.Random (randomRIO)
 
@@ -24,7 +24,7 @@ toR deg = deg * pi / 180
 
 clean :: UserData -> IO ()
 clean ud = do
-  mapM_ gegl_node_drop $ map (\h -> hNodeGraph h M.! "root") (haskelloids ud)
+  mapM_ (gegl_node_drop . (\h -> hNodeGraph h M.! "root")) (haskelloids ud)
   gegl_node_drop $ nodeGraph ud M.! KeyRoot
 
 load :: SDL.Surface -> IO UserData
@@ -47,11 +47,11 @@ load _ = do
   pnop <- gegl_node_new_child root $ Operation "gegl:nop" []
   hnop <- gegl_node_new_child root $ Operation "gegl:nop" []
   fgnop <- gegl_node_new_child root $ Operation "gegl:nop" []
-  sover <- gegl_node_new_child root $ defaultOverOperation
-  hover <- gegl_node_new_child root $ defaultOverOperation
-  pover <- gegl_node_new_child root $ defaultOverOperation
-  bgover <- gegl_node_new_child root $ defaultOverOperation
-  fgover <- gegl_node_new_child root $ defaultOverOperation
+  sover <- gegl_node_new_child root defaultOverOperation
+  hover <- gegl_node_new_child root defaultOverOperation
+  pover <- gegl_node_new_child root defaultOverOperation
+  bgover <- gegl_node_new_child root defaultOverOperation
+  fgover <- gegl_node_new_child root defaultOverOperation
   translate <- gegl_node_new_child root $ Operation "gegl:translate"
     [ Property "x"        $ PropertyDouble 375
     , Property "y"        $ PropertyDouble 275
@@ -120,7 +120,7 @@ load _ = do
     , Property "y" $ PropertyDouble 300
     , Property "sampler" $ PropertyInt $ fromEnum GeglSamplerCubic
     ]
-  menuOver <- gegl_node_new_child root $ defaultOverOperation
+  menuOver <- gegl_node_new_child root defaultOverOperation
   gegl_node_link menuHeading menuTranslateHeading
   gegl_node_link_many [menuText, menuTranslateText, menuOver]
   _ <- gegl_node_connect_to menuTranslateHeading "output" menuOver "aux"
@@ -160,7 +160,7 @@ load _ = do
   --   ) [] ([0..9] :: [Int])
   -- liftIO $ gegl_node_link_many $ map hFlange hs
   -- liftIO $ gegl_node_link (last $ map hFlange hs) hnop
-  return $ UserData
+  return UserData
     { nodeGraph = myMap
     , ship      = Ship
       { sPos = (375, 275)
@@ -188,8 +188,8 @@ insertHaskelloid hasks split (px, py) = do
     Just x -> return $ x + 1
   rot <- liftIO $ randomRIO (0, 360)
   pitch <- liftIO $ randomRIO (-45, 45)
-  tempRoot <- liftIO $ gegl_node_new
-  tempOver <- liftIO $ gegl_node_new_child tempRoot $ defaultOverOperation
+  tempRoot <- liftIO gegl_node_new
+  tempOver <- liftIO $ gegl_node_new_child tempRoot defaultOverOperation
   tempSvg <- gegl_node_new_child tempRoot $ Operation "gegl:svg-load"
     [ Property "path" $ PropertyString "assets/haskelloid.svg"
     , Property "width" $ PropertyInt (100 `div` rdiv)
@@ -262,14 +262,14 @@ haskelloidShotDown h = do
 
 updateHaskelloid :: Double -> Haskelloid -> Affection UserData Haskelloid
 updateHaskelloid sec h@Haskelloid{..} = do
-  let newX = (fst $ hPos) + sec * (fst $ hVel)
-      newY = (snd $ hPos) + sec * (snd $ hVel)
+  let newX = fst hPos + sec * fst hVel
+      newY = snd hPos + sec * snd hVel
       newRot = hRot + hPitch * sec
       (nnx, nny) = wrapAround (newX, newY) (100 / fromIntegral hDiv)
   -- liftIO $ traceIO $ "moving to: " ++ show nnx ++ " " ++ show nny
   liftIO $ gegl_node_set (hNodeGraph M.! "trans") $ Operation "gegl:translate"
-    [ Property "x" $ PropertyDouble $ nnx
-    , Property "y" $ PropertyDouble $ nny
+    [ Property "x" $ PropertyDouble nnx
+    , Property "y" $ PropertyDouble nny
     ]
   liftIO $ gegl_node_set (hNodeGraph M.! "rot") $ Operation "gegl:rotate"
     [ Property "degrees" $ PropertyDouble newRot
@@ -286,9 +286,7 @@ updateHaskelloid sec h@Haskelloid{..} = do
           50
           )
       _ -> return Nothing
-  maybe (return ()) (\_ ->
-    lose
-    ) lost
+  maybe (return ()) (const lose) lost
   return h
     { hPos = (nnx, nny)
     , hRot = newRot
@@ -297,23 +295,23 @@ updateHaskelloid sec h@Haskelloid{..} = do
 wrapAround :: (Ord t, Num t) => (t, t) -> t -> (t, t)
 wrapAround (nx, ny) width = (nnx, nny)
   where
-    nnx =
-      if nx > 800
-      then nx - (800 + width)
-      else if nx < -width then nx + 800 + width else nx
-    nny =
-      if ny > 600
-      then ny - (600 + width)
-      else if ny < -width then ny + 600 + width else ny
+    nnx
+      | nx > 800    = nx - (800 + width)
+      | nx < -width = nx + 800 + width
+      | otherwise   = nx
+    nny
+      | ny > 600    = ny - (600 + width)
+      | ny < -width = ny + 600 + width
+      | otherwise   = ny
 
 shotsUpd :: Double -> Particle -> Affection UserData Particle
 shotsUpd sec part@Particle{..} = do
-  let newX = (fst particlePosition) + sec * (fromIntegral $ fst particleVelocity)
-      newY = (snd particlePosition) + sec * (fromIntegral $ snd particleVelocity)
+  let newX = fst particlePosition + sec * fromIntegral (fst particleVelocity)
+      newY = snd particlePosition + sec * fromIntegral (snd particleVelocity)
       (nnx, nny) = wrapAround (newX, newY) 4
   liftIO $ gegl_node_set (particleNodeGraph M.! "rect") $ Operation "gegl:rectangle"
-    [ Property "x" $ PropertyDouble $ nnx
-    , Property "y" $ PropertyDouble $ nny
+    [ Property "x" $ PropertyDouble nnx
+    , Property "y" $ PropertyDouble nny
     ]
   ud <- getAffection
   inters <- catMaybes <$> mapM (\h -> do
@@ -329,7 +327,7 @@ shotsUpd sec part@Particle{..} = do
       Just _ -> return $ Just h
       Nothing -> return Nothing
     ) (haskelloids ud)
-  when (not $ null inters) $
+  unless (null inters) $
     haskelloidShotDown $ head inters
   lost <- liftIO $ gegl_rectangle_intersect
     (GeglRectangle (floor nnx) (floor nny) 4 4)
@@ -339,12 +337,10 @@ shotsUpd sec part@Particle{..} = do
       50
       50
       )
-  maybe (return ()) (\_ ->
-    lose
-    ) lost
+  maybe (return ()) (const lose) lost
   return part
     { particlePosition = (nnx, nny)
-    , particleTimeToLive = if (not $ null inters) then 0 else particleTimeToLive
+    , particleTimeToLive = if not $ null inters then 0 else particleTimeToLive
     }
 
 shotsDraw :: GeglBuffer -> GeglNode -> Particle -> Affection UserData ()

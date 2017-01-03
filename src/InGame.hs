@@ -41,7 +41,7 @@ loadGame = do
       { sPos = (375, 275)
       , sVel = (0, 0)
       , sRot = 0
-      , sFlange = (nodeGraph ud M.! KeyShipRotate)
+      , sFlange = nodeGraph ud M.! KeyShipRotate
       }
     , pixelSize = 3
     , state = InGame
@@ -73,12 +73,12 @@ updateGame sec = do
     putAffection ud
       { pixelSize = pixelSize ud -1
       }
-  let nx = (fst $ sPos $ ship ud) + (fst $ sVel $ ship ud) * sec
-      ny = (snd $ sPos $ ship ud) + (snd $ sVel $ ship ud) * sec
+  let nx = fst (sPos $ ship ud) + fst (sVel $ ship ud) * sec
+      ny = snd (sPos $ ship ud) + snd (sVel $ ship ud) * sec
       (nnx, nny) = wrapAround (nx, ny) 50
   liftIO $ gegl_node_set (nodeGraph ud M.! KeyShipTranslate) $ Operation "gegl:translate"
-    [ Property "x" $ PropertyDouble $ nnx
-    , Property "y" $ PropertyDouble $ nny
+    [ Property "x" $ PropertyDouble nnx
+    , Property "y" $ PropertyDouble nny
     ]
   liftIO $ gegl_node_set (nodeGraph ud M.! KeyShipRotate) $ Operation "gegl:rotate"
     [ Property "degrees" $ PropertyDouble $ sRot $ ship ud
@@ -108,13 +108,13 @@ handleGameEvent sec e = do
   wd <- getAffection
   case SDL.eventPayload e of
     SDL.KeyboardEvent dat ->
-      case (SDL.keysymKeycode $ SDL.keyboardEventKeysym dat) of
+      case SDL.keysymKeycode $ SDL.keyboardEventKeysym dat of
         SDL.KeycodeLeft -> do
           ud <- getAffection
           when (SDL.keyboardEventKeyMotion dat == SDL.Pressed && not (wonlost ud)) $
             putAffection ud
               { ship = (ship ud)
-                { sRot = (sRot $ ship ud) + 270 * sec
+                { sRot = sRot (ship ud) + 270 * sec
                 }
               }
         SDL.KeycodeRight -> do
@@ -122,14 +122,14 @@ handleGameEvent sec e = do
           when (SDL.keyboardEventKeyMotion dat == SDL.Pressed) $
             putAffection ud
               { ship = (ship ud)
-                { sRot = (sRot $ ship ud) - 270 * sec
+                { sRot = sRot (ship ud) - 270 * sec
                 }
               }
         SDL.KeycodeUp ->
           when (SDL.keyboardEventKeyMotion dat == SDL.Pressed && not (wonlost wd)) $ do
             ud <- getAffection
-            let vx = -10 * (sin (toR $ (sRot $ ship ud))) + fst (sVel $ ship ud)
-                vy = -10 * (cos (toR $ (sRot $ ship ud))) + snd (sVel $ ship ud)
+            let vx = -10 * sin (toR $ sRot $ ship ud) + fst (sVel $ ship ud)
+                vy = -10 * cos (toR $ sRot $ ship ud) + snd (sVel $ ship ud)
             putAffection ud
               { ship = (ship ud)
                 { sVel = (vx, vy)
@@ -144,19 +144,19 @@ handleGameEvent sec e = do
               , Property "size-y" $ PropertyInt 8
               ]
             -- ad <- get
-            let posX = (fst $ sPos $ ship ud) + 23 - 35 * sin (toR $ sRot $ ship ud)
-                posY = (snd $ sPos $ ship ud) + 23 - 35 * cos (toR $ sRot $ ship ud)
-            tempRoot <- liftIO $ gegl_node_new
+            let posX = fst (sPos $ ship ud) + 23 - 35 * sin (toR $ sRot $ ship ud)
+                posY = snd (sPos $ ship ud) + 23 - 35 * cos (toR $ sRot $ ship ud)
+            tempRoot <- liftIO gegl_node_new
             tempRect <- liftIO $ gegl_node_new_child tempRoot $ Operation "gegl:rectangle"
-              [ Property "x" $ PropertyDouble $ posX
-              , Property "y" $ PropertyDouble $ posY
+              [ Property "x" $ PropertyDouble posX
+              , Property "y" $ PropertyDouble posY
               , Property "width" $ PropertyDouble 4
               , Property "height" $ PropertyDouble 4
-              , Property "color" $ PropertyColor $ (GEGL.RGBA 1 1 1 1)
+              , Property "color" $ PropertyColor $ GEGL.RGBA 1 1 1 1
               ]
-            tempOver <- liftIO $ gegl_node_new_child tempRoot $ defaultOverOperation
+            tempOver <- liftIO $ gegl_node_new_child tempRoot defaultOverOperation
             _ <- liftIO $ gegl_node_connect_to tempRect "output" tempOver "aux"
-            ips <- insertParticle (shots ud) $
+            ips <- insertParticle (shots ud)
               Particle
                 { particleTimeToLive = 5
                 , particleCreation = elapsedTime ad
@@ -165,8 +165,8 @@ handleGameEvent sec e = do
                 , particleVelocity =
                   -- ( (floor $ -200 * (sin $ toR $ (sRot $ ship ud) + (fst $ sVel $ ship ud)))
                   -- , (floor $ -200 * (cos $ toR $ (sRot $ ship ud) + (snd $ sVel $ ship ud)))
-                  ( (floor $ -200 * (sin $ toR $ sRot $ ship ud))
-                  , (floor $ -200 * (cos $ toR $ sRot $ ship ud))
+                  ( (floor $ (-200) * (sin $ toR $ sRot $ ship ud))
+                  , (floor $ (-200) * (cos $ toR $ sRot $ ship ud))
                   )
                 , particlePitchRate = Rad 0
                 , particleRootNode = tempRoot
