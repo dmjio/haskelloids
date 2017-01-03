@@ -39,9 +39,9 @@ data Haskelloid = Haskelloid
 
 data NodeKey
   = KeyRoot
-  | KeyTranslate
-  | KeyRotate
   | KeyShip
+  | KeyShipTranslate
+  | KeyShipRotate
   | KeyPNop
   | KeyHNop
   | KeyCrop

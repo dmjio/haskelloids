@@ -5,13 +5,102 @@ import qualified SDL
 import GEGL
 
 import qualified Data.Map as M
+import Data.Maybe (catMaybes)
 
-import Control.Monad (when)
+import Control.Monad (when, foldM)
+
+import System.Random (randomRIO)
 
 import Debug.Trace
 
 import Types
 import Commons
+
+loadGame :: Affection UserData ()
+loadGame = do
+  ud <- getAffection
+  _ <- liftIO $ gegl_node_connect_to
+    (nodeGraph ud M.! KeyShipTranslate)
+    "output"
+    (nodeGraph ud M.! KeyShipOver)
+    "aux"
+  hs <- liftIO $ catMaybes <$> foldM (\acc _ -> do
+    coords <- liftIO excludeShip
+    insertHaskelloid acc Nothing coords
+    ) [] ([0..9] :: [Int])
+  liftIO $ gegl_node_link_many $ map hFlange hs
+  liftIO $ gegl_node_link (last $ map hFlange hs) (nodeGraph ud M.! KeyHNop)
+  putAffection ud
+    { haskelloids = hs
+    , wonlost = False
+    , shots = ParticleSystem
+      (ParticleStorage Nothing [])
+      (nodeGraph ud M.! KeyPNop)
+      (buffer ud)
+    , ship = Ship
+      { sPos = (375, 275)
+      , sVel = (0, 0)
+      , sRot = 0
+      , sFlange = (nodeGraph ud M.! KeyShipRotate)
+      }
+    , pixelSize = 3
+    , state = InGame
+    }
+
+excludeShip :: IO (Double, Double)
+excludeShip = do
+  px <- randomRIO (0, 800)
+  py <- randomRIO (0, 600)
+  inter <- gegl_rectangle_intersect
+    (GeglRectangle px py 100 100)
+    (GeglRectangle 350 250 100 100) -- Ship's starting position and size
+  case inter of
+    Just _ ->
+      excludeShip
+    Nothing ->
+      return (fromIntegral px, fromIntegral py)
+
+updateGame :: Double -> Affection UserData ()
+updateGame sec = do
+  ad <- get
+  ud <- getAffection
+  when (((floor $ elapsedTime ad :: Int) * 100) `mod` 10 < 2 && pixelSize ud > 3) $ do
+    pd <- getAffection
+    liftIO $ gegl_node_set (nodeGraph pd M.! KeyPixelize) $ Operation "gegl:pixelize"
+      [ Property "size-x" $ PropertyInt $ pixelSize pd - 1
+      , Property "size-y" $ PropertyInt $ pixelSize pd - 1
+      ]
+    putAffection ud
+      { pixelSize = pixelSize ud -1
+      }
+  let nx = (fst $ sPos $ ship ud) + (fst $ sVel $ ship ud) * sec
+      ny = (snd $ sPos $ ship ud) + (snd $ sVel $ ship ud) * sec
+      (nnx, nny) = wrapAround (nx, ny) 50
+  liftIO $ gegl_node_set (nodeGraph ud M.! KeyShipTranslate) $ Operation "gegl:translate"
+    [ Property "x" $ PropertyDouble $ nnx
+    , Property "y" $ PropertyDouble $ nny
+    ]
+  liftIO $ gegl_node_set (nodeGraph ud M.! KeyShipRotate) $ Operation "gegl:rotate"
+    [ Property "degrees" $ PropertyDouble $ sRot $ ship ud
+    ]
+  td <- getAffection
+  putAffection td
+    { ship = (ship ud)
+      { sPos = (nnx, nny)
+      }
+    }
+  ud2 <- getAffection
+  nhs <- mapM (updateHaskelloid sec) (haskelloids ud2)
+  putAffection ud2
+    { haskelloids = nhs
+    }
+  liftIO $ traceIO $ show $ length nhs
+  ud3 <- getAffection
+  ups <- updateParticleSystem (shots ud3) sec shotsUpd shotsDraw
+  ud4 <- getAffection
+  putAffection ud4
+    { shots = ups
+    }
 
 handleGameEvent :: Double -> SDL.Event -> Affection UserData ()
 handleGameEvent sec e = do

@@ -1,3 +1,5 @@
+{-# LANGUAGE RecordWildCards #-}
+
 module Commons where
 
 import Affection
@@ -6,8 +8,10 @@ import GEGL
 import BABL
 
 import qualified Data.Map as M
+import Data.List (delete)
+import Data.Maybe (catMaybes)
 
-import Control.Monad (foldM)
+import Control.Monad (foldM, when)
 
 import System.Random (randomRIO)
 
@@ -127,14 +131,14 @@ load _ = do
   _ <- gegl_node_connect_to hnop "output" hover "aux"
   _ <- gegl_node_connect_to bg "output" bgover "aux"
   -- liftIO $ gegl_node_link fgnop fgtranslate
-  -- _ <- gegl_node_connect_to fgtranslate "output" fgover "aux"
+  _ <- gegl_node_connect_to fgtranslate "output" fgover "aux"
   _ <- gegl_node_connect_to fgnop "output" fgover "aux"
   traceM "nodes complete"
   myMap <- return $ M.fromList
     [ (KeyRoot, root)
-    , (KeyTranslate, translate)
-    , (KeyRotate, rotate)
     , (KeyShip, shipNode)
+    , (KeyShipTranslate, translate)
+    , (KeyShipRotate, rotate)
     , (KeyPNop, pnop)
     , (KeyHNop, hnop)
     , (KeyCrop, crop)
@@ -222,3 +226,139 @@ insertHaskelloid hasks split (px, py) = do
       , ("rot", tempRot)
       ]
     } : hasks
+
+haskelloidShotDown :: Haskelloid -> Affection UserData ()
+haskelloidShotDown h = do
+  ud <- getAffection
+  -- liftIO $ traceIO $ show $ length $ haskelloids ud
+  let redHaskelloids = delete h (haskelloids ud)
+  newHaskelloids <- catMaybes <$> foldM
+    (\acc _ ->
+      if hDiv h < 4
+      then
+        liftIO $ insertHaskelloid acc (Just $ hDiv h) $ hPos h
+      else
+        return $ Nothing : acc
+      )
+    (map Just redHaskelloids) ([0..1] :: [Int])
+  liftIO $ gegl_node_drop $ hNodeGraph h M.! "root"
+  liftIO $ gegl_node_link_many $ map hFlange newHaskelloids
+  if not $ null newHaskelloids
+  then 
+    liftIO $ gegl_node_link
+      (last $ map hFlange newHaskelloids)
+      (nodeGraph ud M.! KeyHNop)
+  else do
+    liftIO $ traceIO "YOU WON!"
+    liftIO $ gegl_node_link
+      (nodeGraph ud M.! KeyWon)
+      (nodeGraph ud M.! KeyFGNop)
+    putAffection ud
+      { wonlost = True
+      }
+  putAffection ud
+    { haskelloids = newHaskelloids
+    }
+
+updateHaskelloid :: Double -> Haskelloid -> Affection UserData Haskelloid
+updateHaskelloid sec h@Haskelloid{..} = do
+  let newX = (fst $ hPos) + sec * (fst $ hVel)
+      newY = (snd $ hPos) + sec * (snd $ hVel)
+      newRot = hRot + hPitch * sec
+      (nnx, nny) = wrapAround (newX, newY) (100 / fromIntegral hDiv)
+  -- liftIO $ traceIO $ "moving to: " ++ show nnx ++ " " ++ show nny
+  liftIO $ gegl_node_set (hNodeGraph M.! "trans") $ Operation "gegl:translate"
+    [ Property "x" $ PropertyDouble $ nnx
+    , Property "y" $ PropertyDouble $ nny
+    ]
+  liftIO $ gegl_node_set (hNodeGraph M.! "rot") $ Operation "gegl:rotate"
+    [ Property "degrees" $ PropertyDouble newRot
+    ]
+  ud <- getAffection
+  lost <- 
+    case state ud of
+      InGame -> liftIO $ gegl_rectangle_intersect
+        (GeglRectangle (floor nnx) (floor nny) (100 `div` hDiv) (100 `div` hDiv))
+        (GeglRectangle
+          (floor $ fst $ sPos $ ship ud)
+          (floor $ snd $ sPos $ ship ud)
+          50
+          50
+          )
+      _ -> return Nothing
+  maybe (return ()) (\_ ->
+    lose
+    ) lost
+  return h
+    { hPos = (nnx, nny)
+    , hRot = newRot
+    }
+
+wrapAround :: (Ord t, Num t) => (t, t) -> t -> (t, t)
+wrapAround (nx, ny) width = (nnx, nny)
+  where
+    nnx =
+      if nx > 800
+      then nx - (800 + width)
+      else if nx < -width then nx + 800 + width else nx
+    nny =
+      if ny > 600
+      then ny - (600 + width)
+      else if ny < -width then ny + 600 + width else ny
+
+shotsUpd :: Double -> Particle -> Affection UserData Particle
+shotsUpd sec part@Particle{..} = do
+  let newX = (fst particlePosition) + sec * (fromIntegral $ fst particleVelocity)
+      newY = (snd particlePosition) + sec * (fromIntegral $ snd particleVelocity)
+      (nnx, nny) = wrapAround (newX, newY) 4
+  liftIO $ gegl_node_set (particleNodeGraph M.! "rect") $ Operation "gegl:rectangle"
+    [ Property "x" $ PropertyDouble $ nnx
+    , Property "y" $ PropertyDouble $ nny
+    ]
+  ud <- getAffection
+  inters <- catMaybes <$> mapM (\h -> do
+    col <- liftIO $ gegl_rectangle_intersect
+      (GeglRectangle (floor nnx) (floor nny) 4 4)
+      (GeglRectangle
+        (floor $ fst $ hPos h)
+        (floor $ snd $ hPos h)
+        (100 `div` hDiv h)
+        (100 `div` hDiv h)
+        )
+    case col of
+      Just _ -> return $ Just h
+      Nothing -> return Nothing
+    ) (haskelloids ud)
+  when (not $ null inters) $
+    haskelloidShotDown $ head inters
+  lost <- liftIO $ gegl_rectangle_intersect
+    (GeglRectangle (floor nnx) (floor nny) 4 4)
+    (GeglRectangle
+      (floor $ fst $ sPos $ ship ud)
+      (floor $ snd $ sPos $ ship ud)
+      50
+      50
+      )
+  maybe (return ()) (\_ ->
+    lose
+    ) lost
+  return part
+    { particlePosition = (nnx, nny)
+    , particleTimeToLive = if (not $ null inters) then 0 else particleTimeToLive
+    }
+
+shotsDraw :: GeglBuffer -> GeglNode -> Particle -> Affection UserData ()
+shotsDraw _ _ _ = return ()
+
+lose :: Affection UserData ()
+lose = do
+  ud <- getAffection
+  liftIO $ traceIO "YOU LOST!"
+  _ <- liftIO $ gegl_node_link
+    (nodeGraph ud M.! KeyLost)
+    (nodeGraph ud M.! KeyFGNop)
+  putAffection ud
+    { wonlost = True
+    }
+  _ <- liftIO $ gegl_node_disconnect (nodeGraph ud M.! KeyShipOver) "aux"
+  return ()
