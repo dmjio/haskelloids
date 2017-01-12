@@ -94,13 +94,29 @@ updateGame sec = do
   putAffection ud2
     { haskelloids = nhs
     }
-  liftIO $ traceIO $ show $ length nhs
+  -- liftIO $ traceIO $ show $ length nhs
   ud3 <- getAffection
   ups <- updateParticleSystem (shots ud3) sec shotsUpd shotsDraw
   ud4 <- getAffection
   putAffection ud4
     { shots = ups
     }
+
+drawGame :: Affection UserData ()
+drawGame = do
+  ud <- getAffection
+  liftIO $ gegl_node_process $ nodeGraph ud M.! KeySink
+  present
+    (GeglRectangle (floor $ fst $ sPos $ ship ud) (floor $ snd $ sPos $ ship ud) 50 50)
+    (buffer ud)
+    False
+  mapM_ (\h -> do
+    let s = 100 `div` hDiv h
+    present
+      (GeglRectangle (floor $ fst $ hPos h) (floor $ snd $ hPos h) s s)
+      (buffer ud)
+      False
+    ) (haskelloids ud)
 
 handleGameEvent :: Double -> SDL.Event -> Affection UserData ()
 handleGameEvent sec e = do
