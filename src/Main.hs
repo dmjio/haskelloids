@@ -44,11 +44,10 @@ pre = do
   --   (buffer ud)
   --   True
 
-update :: Double -> Affection UserData ()
-update sec = do
+update :: Double -> [SDL.Event] -> Affection UserData ()
+update sec evs = do
   wd <- getAffection
   smUpdate (state wd) sec
-  evs <- SDL.pollEvents
   mapM_ (smEvent (state wd) sec) evs
 
 draw :: Affection UserData ()

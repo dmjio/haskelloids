@@ -18,18 +18,22 @@ import Commons
 
 loadGame :: Affection UserData ()
 loadGame = do
+  liftIO $ traceIO "loading game"
   ud <- getAffection
   _ <- liftIO $ gegl_node_connect_to
     (nodeGraph ud M.! KeyShipTranslate)
     "output"
     (nodeGraph ud M.! KeyShipOver)
     "aux"
+  liftIO $ traceIO "nodes connected"
   hs <- liftIO $ catMaybes <$> foldM (\acc _ -> do
     coords <- liftIO excludeShip
     insertHaskelloid acc Nothing coords
     ) [] ([0..9] :: [Int])
+  liftIO $ traceIO "inserted haskelloids"
   liftIO $ gegl_node_link_many $ map hFlange hs
   liftIO $ gegl_node_link (last $ map hFlange hs) (nodeGraph ud M.! KeyHNop)
+  liftIO $ traceIO "nodes linked"
   putAffection ud
     { haskelloids = hs
     , wonlost = False
@@ -46,6 +50,11 @@ loadGame = do
     , pixelSize = 3
     , state = InGame
     }
+  liftIO $ traceIO "game loaded"
+  present
+    (GeglRectangle 0 0 800 600)
+    (buffer ud)
+    True
 
 excludeShip :: IO (Double, Double)
 excludeShip = do
@@ -104,19 +113,25 @@ updateGame sec = do
 
 drawGame :: Affection UserData ()
 drawGame = do
+  -- ud <- getAffection
+  -- liftIO $ gegl_node_process $ nodeGraph ud M.! KeySink
+  -- present
+  --   (GeglRectangle (floor $ fst $ sPos $ ship ud) (floor $ snd $ sPos $ ship ud) 50 50)
+  --   (buffer ud)
+  --   False
+  -- mapM_ (\h -> do
+  --   let s = 100 `div` hDiv h
+  --   present
+  --     (GeglRectangle (floor $ fst $ hPos h) (floor $ snd $ hPos h) s s)
+  --     (buffer ud)
+  --     False
+  --   ) (haskelloids ud)
   ud <- getAffection
   liftIO $ gegl_node_process $ nodeGraph ud M.! KeySink
   present
-    (GeglRectangle (floor $ fst $ sPos $ ship ud) (floor $ snd $ sPos $ ship ud) 50 50)
+    (GeglRectangle 0 0 800 600)
     (buffer ud)
-    False
-  mapM_ (\h -> do
-    let s = 100 `div` hDiv h
-    present
-      (GeglRectangle (floor $ fst $ hPos h) (floor $ snd $ hPos h) s s)
-      (buffer ud)
-      False
-    ) (haskelloids ud)
+    True
 
 handleGameEvent :: Double -> SDL.Event -> Affection UserData ()
 handleGameEvent sec e = do
