@@ -92,7 +92,7 @@ instance StateMachine State UserData where
           }
       _ -> return ()
 
-  smEvent InGame sec e = handleGameEvent sec e 
+  smEvent InGame sec e = handleGameEvent (smLoad Menu) sec e
 
   smDraw Menu = do
     ud <- getAffection

@@ -125,8 +125,12 @@ drawGame = do
     (buffer ud)
     True
 
-handleGameEvent :: Double -> SDL.Event -> Affection UserData ()
-handleGameEvent sec e = do
+handleGameEvent
+  :: Affection UserData ()
+  -> Double
+  -> SDL.Event
+  -> Affection UserData ()
+handleGameEvent menuload sec e = do
   ad <- get
   wd <- getAffection
   case SDL.eventPayload e of
@@ -206,11 +210,10 @@ handleGameEvent sec e = do
               , pixelSize = 8
               }
         SDL.KeycodeR ->
-          when (SDL.keyboardEventKeyMotion dat == SDL.Pressed) $ do
+          when (SDL.keyboardEventKeyMotion dat == SDL.Pressed && wonlost wd) $ do
             liftIO $ traceIO "reloading"
-            liftIO $ clean wd
-            nd <- liftIO $ load $ drawSurface ad
-            putAffection nd
+            -- liftIO $ clean wd
+            menuload
         _ -> return ()
     SDL.WindowClosedEvent _ -> do
       traceM "seeya!"
