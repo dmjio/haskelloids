@@ -263,7 +263,8 @@ haskelloidShotDown h = do
     putAffection ud
       { wonlost = True
       }
-  putAffection ud
+  ud2 <- getAffection
+  putAffection ud2
     { haskelloids = newHaskelloids
     }
 
@@ -293,7 +294,10 @@ updateHaskelloid sec h@Haskelloid{..} = do
           50
           )
       _ -> return Nothing
-  maybe (return ()) (const lose) lost
+  maybe (return ()) (const $ do
+    lose
+    putAffection ud {wonlost = True}
+    ) lost
   return h
     { hPos = (nnx, nny)
     , hRot = newRot

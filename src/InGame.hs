@@ -15,6 +15,7 @@ import Debug.Trace
 
 import Types
 import Commons
+import Menu
 
 loadGame :: Affection UserData ()
 loadGame = do
@@ -103,7 +104,8 @@ updateGame sec = do
     }
   ud2 <- getAffection
   nhs <- mapM (updateHaskelloid sec) (haskelloids ud2)
-  putAffection ud2
+  ud3 <- getAffection
+  putAffection ud3
     { haskelloids = nhs
     }
   -- liftIO $ traceIO $ show $ length nhs
