@@ -118,19 +118,6 @@ updateGame sec = do
 
 drawGame :: Affection UserData ()
 drawGame = do
-  -- ud <- getAffection
-  -- liftIO $ gegl_node_process $ nodeGraph ud M.! KeySink
-  -- present
-  --   (GeglRectangle (floor $ fst $ sPos $ ship ud) (floor $ snd $ sPos $ ship ud) 50 50)
-  --   (buffer ud)
-  --   False
-  -- mapM_ (\h -> do
-  --   let s = 100 `div` hDiv h
-  --   present
-  --     (GeglRectangle (floor $ fst $ hPos h) (floor $ snd $ hPos h) s s)
-  --     (buffer ud)
-  --     False
-  --   ) (haskelloids ud)
   ud <- getAffection
   liftIO $ gegl_node_process $ nodeGraph ud M.! KeySink
   present
