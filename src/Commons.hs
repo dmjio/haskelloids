@@ -130,8 +130,8 @@ load _ = do
   _ <- gegl_node_connect_to pnop "output" pover "aux"
   _ <- gegl_node_connect_to hnop "output" hover "aux"
   _ <- gegl_node_connect_to bg "output" bgover "aux"
-  -- liftIO $ gegl_node_link fgnop fgtranslate
-  _ <- gegl_node_connect_to fgtranslate "output" fgover "aux"
+  liftIO $ gegl_node_link fgnop fgtranslate
+  -- _ <- gegl_node_connect_to fgtranslate "output" fgover "aux"
   _ <- gegl_node_connect_to fgnop "output" fgover "aux"
   traceM "nodes complete"
   myMap <- return $ M.fromList
@@ -149,6 +149,7 @@ load _ = do
     , (KeyPixelize, pixelize)
     , (KeyFGOver, fgover)
     , (KeyFGNop, fgnop)
+    , (KeyFGTrans, fgtranslate)
     , (KeyMenuHeading, menuTranslateHeading)
     , (KeyMenuText, menuText)
     , (KeyMenuOver, menuOver)
@@ -250,9 +251,15 @@ haskelloidShotDown h = do
       (nodeGraph ud M.! KeyHNop)
   else do
     liftIO $ traceIO "YOU WON!"
-    liftIO $ gegl_node_link
+    _ <- liftIO $ gegl_node_link
       (nodeGraph ud M.! KeyWon)
-      (nodeGraph ud M.! KeyFGNop)
+      (nodeGraph ud M.! KeyFGTrans)
+    _ <- liftIO $ gegl_node_connect_to
+      (nodeGraph ud M.! KeyFGTrans)
+      "output"
+      (nodeGraph ud M.! KeyFGOver)
+      "aux"
+    _ <- liftIO $ gegl_node_disconnect (nodeGraph ud M.! KeyShipOver) "aux"
     putAffection ud
       { wonlost = True
       }
@@ -352,9 +359,13 @@ lose = do
   liftIO $ traceIO "YOU LOST!"
   _ <- liftIO $ gegl_node_link
     (nodeGraph ud M.! KeyLost)
-    (nodeGraph ud M.! KeyFGNop)
+    (nodeGraph ud M.! KeyFGTrans)
+  _ <- liftIO $ gegl_node_connect_to
+    (nodeGraph ud M.! KeyFGTrans)
+    "output"
+    (nodeGraph ud M.! KeyFGOver)
+    "aux"
+  _ <- liftIO $ gegl_node_disconnect (nodeGraph ud M.! KeyShipOver) "aux"
   putAffection ud
     { wonlost = True
     }
-  _ <- liftIO $ gegl_node_disconnect (nodeGraph ud M.! KeyShipOver) "aux"
-  return ()

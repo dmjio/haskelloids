@@ -33,6 +33,9 @@ loadGame = do
   liftIO $ traceIO "inserted haskelloids"
   liftIO $ gegl_node_link_many $ map hFlange hs
   liftIO $ gegl_node_link (last $ map hFlange hs) (nodeGraph ud M.! KeyHNop)
+  liftIO $ gegl_node_disconnect
+    (nodeGraph ud M.! KeyFGOver)
+    "aux"
   liftIO $ traceIO "nodes linked"
   putAffection ud
     { haskelloids = hs

@@ -52,6 +52,7 @@ data NodeKey
   | KeyPixelize
   | KeyFGOver
   | KeyFGNop
+  | KeyFGTrans
   | KeyMenuHeading
   | KeyMenuText
   | KeyMenuStart

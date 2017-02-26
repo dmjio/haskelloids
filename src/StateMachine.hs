@@ -27,9 +27,11 @@ class StateMachine a us where
 instance StateMachine State UserData where
   smLoad Menu = do
     ud <- getAffection
-    liftIO $ gegl_node_link
+    liftIO $ gegl_node_connect_to
       (nodeGraph ud M.! KeyMenuOver)
-      (nodeGraph ud M.! KeyFGNop)
+      "output"
+      (nodeGraph ud M.! KeyFGOver)
+      "aux"
     hs <- liftIO $ catMaybes <$> foldM (\acc _ -> do
       px <- randomRIO (0, 800)
       py <- randomRIO (0, 600)
@@ -37,10 +39,13 @@ instance StateMachine State UserData where
       ) [] ([0..9] :: [Int])
     liftIO $ gegl_node_link_many $ map hFlange hs
     liftIO $ gegl_node_link (last $ map hFlange hs) (nodeGraph ud M.! KeyHNop)
+    liftIO $ gegl_node_disconnect (nodeGraph ud M.! KeyPNop) "input"
     putAffection ud
       { haskelloids = hs
       , fade = FadeIn 1
       , state = Menu
+      , shots = (shots ud)
+        { partSysParts = ParticleStorage Nothing [] }
       }
 
   smLoad InGame = loadGame
