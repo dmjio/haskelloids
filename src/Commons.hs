@@ -104,7 +104,7 @@ load _ = do
     , Property "color"  $ PropertyColor $ GEGL.RGBA 1 1 1 1
     ]
   menuText <- gegl_node_new_child root $ textOperation
-    [ Property "string" $ PropertyString "Press [Space] to start\nPress [H] for Highscore"
+    [ Property "string" $ PropertyString "Press [Space] to start"
     , Property "font"   $ PropertyString "Modulo"
     , Property "size"   $ PropertyDouble 50
     , Property "alignment" $ PropertyInt 1
