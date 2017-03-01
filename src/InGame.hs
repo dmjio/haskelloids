@@ -141,7 +141,7 @@ handleGameEvent menuload sec e = do
           when (SDL.keyboardEventKeyMotion dat == SDL.Pressed && not (wonlost ud)) $
             putAffection ud
               { ship = (ship ud)
-                { sRot = sRot (ship ud) + 270 * sec
+                { sRot = sRot (ship ud) + 5
                 }
               }
         SDL.KeycodeRight -> do
@@ -149,7 +149,7 @@ handleGameEvent menuload sec e = do
           when (SDL.keyboardEventKeyMotion dat == SDL.Pressed) $
             putAffection ud
               { ship = (ship ud)
-                { sRot = sRot (ship ud) - 270 * sec
+                { sRot = sRot (ship ud) - 5
                 }
               }
         SDL.KeycodeUp ->
