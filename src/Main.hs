@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import Affection
+import Affection hiding (StateMachine(..))
 import qualified SDL
 import GEGL
 
@@ -39,108 +39,107 @@ main = withAffection AffectionConfig
 
 update :: Double -> Affection UserData ()
 update sec = do
-  -- traceM $ (show $ 1 / sec) ++ " FPS"
-  ad <- get
-  wd <- getAffection
-  when (((floor $ elapsedTime ad :: Int) * 100) `mod` 10 < 2 && pixelSize wd > 3) $ do
-    liftIO $ gegl_node_set (nodeGraph wd M.! KeyPixelize) $ Operation "gegl:pixelize"
-      [ Property "size-x" $ PropertyInt $ pixelSize wd - 1
-      , Property "size-y" $ PropertyInt $ pixelSize wd - 1
-      ]
-    pd <- getAffection
-    putAffection pd
-      { pixelSize = pixelSize wd -1
-      }
-  -- evs <- SDL.pollEvents
-  -- mapM_ (\e ->
-  --   case state wd of
-  --     InGame ->
-  --       handleGameEvent sec e
-  --     _ -> error "not yet implemented"
-  --   ) evs
-  ud2 <- getAffection
-  nhs <- mapM (updateHaskelloid sec) (haskelloids ud2)
-  -- liftIO $ traceIO $ show $ length nhs
-  putAffection ud2
-    { haskelloids = nhs
-    }
-  ud3 <- getAffection
-  let nx = fst (sPos $ ship ud3) + (fst (sVel $ ship ud3)) * sec
-      ny = snd (sPos $ ship ud3) + (snd (sVel $ ship ud3)) * sec
-      (nnx, nny) = wrapAround (nx, ny) 50
-  liftIO $ gegl_node_set (nodeGraph ud3 M.! KeyTranslate) $ Operation "gegl:translate"
-    [ Property "x" $ PropertyDouble $ nnx
-    , Property "y" $ PropertyDouble $ nny
-    ]
-  liftIO $ gegl_node_set (nodeGraph ud3 M.! KeyRotate) $ Operation "gegl:rotate"
-    [ Property "degrees" $ PropertyDouble $ sRot $ ship ud3
-    ]
-  ups <- updateParticleSystem (shots ud3) sec shotsUpd
-  ud4 <- getAffection
-  putAffection ud4
-    { ship = (ship ud3)
-      { sPos = (nnx, nny)
-      }
-    , shots = ups
-    }
+  ud <- getAffection
+  smUpdate (state ud) sec
 
-update :: Double -> [SDL.Event] -> Affection UserData ()
-update sec evs = do
-  wd <- getAffection
-  smUpdate (state wd) sec
-  mapM_ (smEvent (state wd) sec) evs
+-- update sec = do
+--   -- traceM $ (show $ 1 / sec) ++ " FPS"
+--   ad <- get
+--   wd <- getAffection
+--   when (((floor $ elapsedTime ad :: Int) * 100) `mod` 10 < 2 && pixelSize wd > 3) $ do
+--     liftIO $ gegl_node_set (nodeGraph wd M.! KeyPixelize) $ Operation "gegl:pixelize"
+--       [ Property "size-x" $ PropertyInt $ pixelSize wd - 1
+--       , Property "size-y" $ PropertyInt $ pixelSize wd - 1
+--       ]
+--     pd <- getAffection
+--     putAffection pd
+--       { pixelSize = pixelSize wd -1
+--       }
+--   -- evs <- SDL.pollEvents
+--   -- mapM_ (\e ->
+--   --   case state wd of
+--   --     InGame ->
+--   --       handleGameEvent sec e
+--   --     _ -> error "not yet implemented"
+--   --   ) evs
+--   ud2 <- getAffection
+--   nhs <- mapM (updateHaskelloid sec) (haskelloids ud2)
+--   -- liftIO $ traceIO $ show $ length nhs
+--   putAffection ud2
+--     { haskelloids = nhs
+--     }
+--   ud3 <- getAffection
+--   let nx = fst (sPos $ ship ud3) + (fst (sVel $ ship ud3)) * sec
+--       ny = snd (sPos $ ship ud3) + (snd (sVel $ ship ud3)) * sec
+--       (nnx, nny) = wrapAround (nx, ny) 50
+--   liftIO $ gegl_node_set (nodeGraph ud3 M.! KeyShipTranslate) $ Operation "gegl:translate"
+--     [ Property "x" $ PropertyDouble $ nnx
+--     , Property "y" $ PropertyDouble $ nny
+--     ]
+--   liftIO $ gegl_node_set (nodeGraph ud3 M.! KeyShipRotate) $ Operation "gegl:rotate"
+--     [ Property "degrees" $ PropertyDouble $ sRot $ ship ud3
+--     ]
+--   ups <- updateParticleSystem (shots ud3) sec shotsUpd
+--   ud4 <- getAffection
+--   putAffection ud4
+--     { ship = (ship ud3)
+--       { sPos = (nnx, nny)
+--       }
+--     , shots = ups
+--     }
 
 draw :: Affection UserData ()
 draw = do
   ud <- getAffection
-  drawParticleSystem (shots ud) (\_ _ _ -> return())
-  liftIO $ gegl_node_process $ nodeGraph ud M.! KeySink
-  present
-    (GeglRectangle 0 0 800 600)
-    (buffer ud)
-    True
-  render Nothing Nothing
+  smDraw (state ud)
+  -- drawParticleSystem (shots ud) (\_ _ _ -> return())
+  -- liftIO $ gegl_node_process $ nodeGraph ud M.! KeySink
+  -- present
+  --   (GeglRectangle 0 0 800 600)
+  --   (buffer ud)
+  --   True
+  -- render Nothing Nothing
 
-shotsUpd :: Double -> Particle -> Affection UserData Particle
-shotsUpd sec part@Particle{..} = do
-  let newX = (fst particlePosition) + sec * (fromIntegral $ fst particleVelocity)
-      newY = (snd particlePosition) + sec * (fromIntegral $ snd particleVelocity)
-      (nnx, nny) = wrapAround (newX, newY) 4
-  liftIO $ gegl_node_set (particleNodeGraph M.! "rect") $ Operation "gegl:rectangle"
-    [ Property "x" $ PropertyDouble $ nnx
-    , Property "y" $ PropertyDouble $ nny
-    ]
-  ud <- getAffection
-  inters <- catMaybes <$> mapM (\h -> do
-    col <- liftIO $ gegl_rectangle_intersect
-      (GeglRectangle (floor nnx) (floor nny) 4 4)
-      (GeglRectangle
-        (floor $ fst $ hPos h)
-        (floor $ snd $ hPos h)
-        (100 `div` hDiv h)
-        (100 `div` hDiv h)
-        )
-    case col of
-      Just _ -> return $ Just h
-      Nothing -> return Nothing
-    ) (haskelloids ud)
-  when (not $ null inters) $
-    haskelloidShotDown $ head inters
-  lost <- liftIO $ gegl_rectangle_intersect
-    (GeglRectangle (floor nnx) (floor nny) 4 4)
-    (GeglRectangle
-      (floor $ fst $ sPos $ ship ud)
-      (floor $ snd $ sPos $ ship ud)
-      50
-      50
-      )
-  maybe (return ()) (\_ ->
-    lose
-    ) lost
-  return part
-    { particlePosition = (nnx, nny)
-    , particleTimeToLive = if (not $ null inters) then 0 else particleTimeToLive
-    }
+-- shotsUpd :: Double -> Particle -> Affection UserData Particle
+-- shotsUpd sec part@Particle{..} = do
+--   let newX = (fst particlePosition) + sec * (fromIntegral $ fst particleVelocity)
+--       newY = (snd particlePosition) + sec * (fromIntegral $ snd particleVelocity)
+--       (nnx, nny) = wrapAround (newX, newY) 4
+--   liftIO $ gegl_node_set (particleNodeGraph M.! "rect") $ Operation "gegl:rectangle"
+--     [ Property "x" $ PropertyDouble $ nnx
+--     , Property "y" $ PropertyDouble $ nny
+--     ]
+--   ud <- getAffection
+--   inters <- catMaybes <$> mapM (\h -> do
+--     col <- liftIO $ gegl_rectangle_intersect
+--       (GeglRectangle (floor nnx) (floor nny) 4 4)
+--       (GeglRectangle
+--         (floor $ fst $ hPos h)
+--         (floor $ snd $ hPos h)
+--         (100 `div` hDiv h)
+--         (100 `div` hDiv h)
+--         )
+--     case col of
+--       Just _ -> return $ Just h
+--       Nothing -> return Nothing
+--     ) (haskelloids ud)
+--   when (not $ null inters) $
+--     haskelloidShotDown $ head inters
+--   lost <- liftIO $ gegl_rectangle_intersect
+--     (GeglRectangle (floor nnx) (floor nny) 4 4)
+--     (GeglRectangle
+--       (floor $ fst $ sPos $ ship ud)
+--       (floor $ snd $ sPos $ ship ud)
+--       50
+--       50
+--       )
+--   maybe (return ()) (\_ ->
+--     lose
+--     ) lost
+--   return part
+--     { particlePosition = (nnx, nny)
+--     , particleTimeToLive = if (not $ null inters) then 0 else particleTimeToLive
+--     }
 
 haskelloidShotDown :: Haskelloid -> Affection UserData ()
 haskelloidShotDown h = do
@@ -175,39 +174,39 @@ haskelloidShotDown h = do
     { haskelloids = newHaskelloids
     }
 
-updateHaskelloid :: Double -> Haskelloid -> Affection UserData Haskelloid
-updateHaskelloid sec h@Haskelloid{..} = do
-  let newX = (fst $ hPos) + sec * (fst $ hVel)
-      newY = (snd $ hPos) + sec * (snd $ hVel)
-      rawRot = hRot + hPitch * sec
-      newRot
-        | rawRot > 360  = rawRot - 360
-        | rawRot < -360 = rawRot + 360
-        | otherwise     = rawRot
-      (nnx, nny) = wrapAround (newX, newY) (100 / fromIntegral hDiv)
-  liftIO $ gegl_node_set (hNodeGraph M.! "trans") $ Operation "gegl:translate"
-    [ Property "x" $ PropertyDouble $ nnx
-    , Property "y" $ PropertyDouble $ nny
-    ]
-  liftIO $ gegl_node_set (hNodeGraph M.! "rot") $ Operation "gegl:rotate"
-    [ Property "degrees" $ PropertyDouble newRot
-    ]
-  ud <- getAffection
-  lost <- liftIO $ gegl_rectangle_intersect
-    (GeglRectangle (floor nnx) (floor nny) (100 `div` hDiv) (100 `div` hDiv))
-    (GeglRectangle
-      (floor $ fst $ sPos $ ship ud)
-      (floor $ snd $ sPos $ ship ud)
-      50
-      50
-      )
-  maybe (return ()) (\_ ->
-    lose
-    ) lost
-  return h
-    { hPos = (nnx, nny)
-    , hRot = newRot
-    }
+-- updateHaskelloid :: Double -> Haskelloid -> Affection UserData Haskelloid
+-- updateHaskelloid sec h@Haskelloid{..} = do
+--   let newX = (fst $ hPos) + sec * (fst $ hVel)
+--       newY = (snd $ hPos) + sec * (snd $ hVel)
+--       rawRot = hRot + hPitch * sec
+--       newRot
+--         | rawRot > 180  = rawRot - 360
+--         | rawRot < -180 = rawRot + 360
+--         | otherwise     = rawRot
+--       (nnx, nny) = wrapAround (newX, newY) (100 / fromIntegral hDiv)
+--   liftIO $ gegl_node_set (hNodeGraph M.! "trans") $ Operation "gegl:translate"
+--     [ Property "x" $ PropertyDouble $ nnx
+--     , Property "y" $ PropertyDouble $ nny
+--     ]
+--   liftIO $ gegl_node_set (hNodeGraph M.! "rot") $ Operation "gegl:rotate"
+--     [ Property "degrees" $ PropertyDouble newRot
+--     ]
+--   ud <- getAffection
+--   lost <- liftIO $ gegl_rectangle_intersect
+--     (GeglRectangle (floor nnx) (floor nny) (100 `div` hDiv) (100 `div` hDiv))
+--     (GeglRectangle
+--       (floor $ fst $ sPos $ ship ud)
+--       (floor $ snd $ sPos $ ship ud)
+--       50
+--       50
+--       )
+--   maybe (return ()) (\_ ->
+--     lose
+--     ) lost
+--   return h
+--     { hPos = (nnx, nny)
+--     , hRot = newRot
+--     }
 
 lose :: Affection UserData ()
 lose = do

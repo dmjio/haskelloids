@@ -2,7 +2,7 @@
 
 module StateMachine where
 
-import Affection
+import Affection hiding (StateMachine(..))
 import qualified SDL
 import GEGL
 
@@ -92,7 +92,8 @@ instance StateMachine State UserData where
           }
       _ -> return ()
 
-  smEvent InGame sec e = handleGameEvent (smLoad Menu) sec e
+  -- smEvent InGame sec e = handleGameEvent (smLoad Menu) sec e
+  smEvent InGame _ e = handleGameEvent (SDL.eventPayload e)
 
   smDraw Menu = do
     ud <- getAffection

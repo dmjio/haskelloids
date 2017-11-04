@@ -110,7 +110,8 @@ updateGame sec = do
     }
   -- liftIO $ traceIO $ show $ length nhs
   ud3 <- getAffection
-  ups <- updateParticleSystem (shots ud3) sec shotsUpd shotsDraw
+  -- ups <- updateParticleSystem (shots ud3) sec shotsUpd shotsDraw
+  ups <- updateParticleSystem (shots ud3) sec shotsUpd
   ud4 <- getAffection
   putAffection ud4
     { shots = ups
