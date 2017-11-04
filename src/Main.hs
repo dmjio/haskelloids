@@ -24,11 +24,14 @@ main = withAffection $ AffectionConfig
   { initComponents = All
   , windowTitle    = "Haskelloids"
   , windowConfig   = defaultWindow
+  , initScreenMode = SDL.Windowed
   , preLoop        = return ()
   , drawLoop       = draw
   , updateLoop     = update
   , loadState      = load
   , cleanUp        = clean
+  , canvasSize     = Nothing
+  , eventLoop      = handleGameEvent
   }
 
 update :: Double -> Affection UserData ()
@@ -45,13 +48,13 @@ update sec = do
     putAffection pd
       { pixelSize = pixelSize wd -1
       }
-  evs <- SDL.pollEvents
-  mapM_ (\e ->
-    case state wd of
-      InGame ->
-        handleGameEvent sec e
-      _ -> error "not yet implemented"
-    ) evs
+  -- evs <- SDL.pollEvents
+  -- mapM_ (\e ->
+  --   case state wd of
+  --     InGame ->
+  --       handleGameEvent sec e
+  --     _ -> error "not yet implemented"
+  --   ) evs
   ud2 <- getAffection
   nhs <- mapM (updateHaskelloid sec) (haskelloids ud2)
   -- liftIO $ traceIO $ show $ length nhs
@@ -69,7 +72,7 @@ update sec = do
   liftIO $ gegl_node_set (nodeGraph ud3 M.! KeyRotate) $ Operation "gegl:rotate"
     [ Property "degrees" $ PropertyDouble $ sRot $ ship ud3
     ]
-  ups <- updateParticleSystem (shots ud3) sec shotsUpd shotsDraw
+  ups <- updateParticleSystem (shots ud3) sec shotsUpd
   ud4 <- getAffection
   putAffection ud4
     { ship = (ship ud3)
@@ -93,21 +96,13 @@ wrapAround (nx, ny) width = (nnx, nny)
 draw :: Affection UserData ()
 draw = do
   ud <- getAffection
+  drawParticleSystem (shots ud) (\_ _ _ -> return())
   liftIO $ gegl_node_process $ nodeGraph ud M.! KeySink
-  -- mintr <- liftIO $ gegl_rectangle_intersect
-  --   (GeglRectangle 0 0 800 600)
-  --   (GeglRectangle (floor $ fst $ sPos $ ship ud) (floor $ snd $ sPos $ ship ud) 50 50)
-  -- maybe (return ()) (\intr ->
-  --   present
-  --     (GeglRectangle (floor $ fst $ sPos $ ship ud) (floor $ snd $ sPos $ ship ud) 50 50)
-  --     (buffer ud)
-  --     False
-  --   ) mintr
-  -- XXX: above part crashes regularly for no apparent reason
   present
     (GeglRectangle 0 0 800 600)
     (buffer ud)
     True
+  render Nothing Nothing
 
 shotsUpd :: Double -> Particle -> Affection UserData Particle
 shotsUpd sec part@Particle{..} = do
@@ -183,14 +178,15 @@ haskelloidShotDown h = do
     { haskelloids = newHaskelloids
     }
 
-shotsDraw :: GeglBuffer -> GeglNode -> Particle -> Affection UserData ()
-shotsDraw _ _ _ = return ()
-
 updateHaskelloid :: Double -> Haskelloid -> Affection UserData Haskelloid
 updateHaskelloid sec h@Haskelloid{..} = do
   let newX = (fst $ hPos) + sec * (fst $ hVel)
       newY = (snd $ hPos) + sec * (snd $ hVel)
-      newRot = hRot + hPitch * sec
+      rawRot = hRot + hPitch * sec
+      newRot
+        | rawRot > 360  = rawRot - 360
+        | rawRot < -360 = rawRot + 360
+        | otherwise     = rawRot
       (nnx, nny) = wrapAround (newX, newY) (100 / fromIntegral hDiv)
   liftIO $ gegl_node_set (hNodeGraph M.! "trans") $ Operation "gegl:translate"
     [ Property "x" $ PropertyDouble $ nnx

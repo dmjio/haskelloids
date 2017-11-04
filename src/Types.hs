@@ -1,6 +1,6 @@
 module Types where
 
-import Affection
+import Affection hiding (StateMachine)
 import qualified SDL
 import GEGL
 import BABL

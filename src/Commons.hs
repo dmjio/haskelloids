@@ -24,8 +24,8 @@ clean ud = do
   mapM_ gegl_node_drop $ map (\h -> hNodeGraph h M.! "root") (haskelloids ud)
   gegl_node_drop $ nodeGraph ud M.! KeyRoot
 
-load :: SDL.Surface -> IO UserData
-load _ = do
+load :: IO UserData
+load = do
   traceM "loading"
   root <- gegl_node_new
   traceM "root node"
@@ -86,7 +86,6 @@ load _ = do
     , Property "color"  $ PropertyColor $ GEGL.RGBA 1 1 1 1
     ]
   vignette <- gegl_node_new_child root $ Operation "gegl:vignette" []
-  -- pixelize <- gegl_node_new_child root $ Operation "gegl:pixelize"
   pixelize <- gegl_node_new_child root $ Operation "gegl:pixelize"
     [ Property "size-x" $ PropertyInt 3
     , Property "size-y" $ PropertyInt 3
@@ -119,13 +118,16 @@ load _ = do
     , (KeyFGOver, fgover)
     , (KeyFGNop, fgnop)
     ]
+  traceM "built map"
   hs <- catMaybes <$> foldM (\acc _ -> do
     px <- liftIO $ randomRIO (0, 800)
     py <- liftIO $ randomRIO (0, 600)
     insertHaskelloid acc Nothing (px, py)
     ) [] ([0..9] :: [Int])
+  traceM "built haskelloids"
   liftIO $ gegl_node_link_many $ map hFlange hs
   liftIO $ gegl_node_link (last $ map hFlange hs) hnop
+  traceM "linking haskelloids and returning UserData"
   return $ UserData
     { nodeGraph = myMap
     , ship      = Ship
@@ -144,33 +146,40 @@ load _ = do
 
 insertHaskelloid :: [Maybe Haskelloid] -> Maybe Int -> (Double, Double) -> IO [Maybe Haskelloid]
 insertHaskelloid hasks split (px, py) = do
-  -- liftIO $ traceIO "inserting haskelloid"
+  liftIO $ traceIO "inserting haskelloid"
   vx <- liftIO $ randomRIO (-10, 10)
   vy <- liftIO $ randomRIO (-10, 10)
   rdiv <- case split of
     Nothing -> liftIO $ randomRIO (1, 2)
     Just x -> return $ x + 1
-  rot <- liftIO $ randomRIO (0, 360)
-  pitch <- liftIO $ randomRIO (-45, 45)
+  rot <- liftIO $ randomRIO ((-180) , 180)
+  pitch <- liftIO $ randomRIO ((-(pi/2)), pi/2)
   tempRoot <- liftIO $ gegl_node_new
   tempOver <- liftIO $ gegl_node_new_child tempRoot $ defaultOverOperation
-  tempSvg <- gegl_node_new_child tempRoot $ Operation "gegl:svg-load"
-    [ Property "path" $ PropertyString "assets/haskelloid.svg"
-    , Property "width" $ PropertyInt (100 `div` rdiv)
-    , Property "height" $ PropertyInt (100 `div` rdiv)
+  tempSvg <- gegl_node_new_child tempRoot $ Operation "gegl:png-load"
+    [ Property "path" $ PropertyString "assets/haskelloid.png"
     ]
+  liftIO $ traceIO "svg loaded"
+  tempScale <- gegl_node_new_child tempRoot $ Operation "gegl:scale-size"
+    [ Property "sampler"  $ PropertyInt $ fromEnum GeglSamplerCubic
+    , Property "x" $ PropertyDouble (100 / (fromIntegral rdiv) :: Double)
+    , Property "y" $ PropertyDouble (100 / (fromIntegral rdiv) :: Double)
+    ]
+  liftIO $ traceIO "scaled"
   tempTrans <- liftIO $ gegl_node_new_child tempRoot $ Operation "gegl:translate"
     [ Property "x" $ PropertyDouble $ px + (100 / fromIntegral rdiv / 2)
     , Property "y" $ PropertyDouble $ py + (100 / fromIntegral rdiv / 2)
     , Property "sampler"  $ PropertyInt $ fromEnum GeglSamplerCubic
     ]
+  liftIO $ traceIO "translated"
   tempRot <- liftIO $ gegl_node_new_child tempRoot $ Operation "gegl:rotate"
     [ Property "origin-x" $ PropertyDouble (100 / 2 / fromIntegral rdiv)
     , Property "origin-y" $ PropertyDouble (100 / 2 / fromIntegral rdiv)
     , Property "degrees" $ PropertyDouble rot
     , Property "sampler"  $ PropertyInt $ fromEnum GeglSamplerCubic
     ]
-  liftIO $ gegl_node_link_many [tempSvg, tempRot, tempTrans]
+  liftIO $ traceIO $ "rotated: " ++ show rot
+  liftIO $ gegl_node_link_many [tempSvg, tempScale, tempRot, tempTrans]
   _ <- liftIO $ gegl_node_connect_to tempTrans "output" tempOver "aux"
   return $ Just  Haskelloid
     { hPos =
