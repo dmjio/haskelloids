@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, RecordWildCards #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Main where
 
 import Affection
@@ -16,11 +16,14 @@ import Debug.Trace
 -- internal imports
 
 import Types
-import InGame
 import Commons
+import StateMachine
+
+import Menu
+import InGame
 
 main :: IO ()
-main = withAffection $ AffectionConfig
+main = withAffection AffectionConfig
   { initComponents = All
   , windowTitle    = "Haskelloids"
   , windowConfig   = defaultWindow
@@ -81,17 +84,11 @@ update sec = do
     , shots = ups
     }
 
-wrapAround :: (Ord t, Num t) => (t, t) -> t -> (t, t)
-wrapAround (nx, ny) width = (nnx, nny)
-  where
-    nnx =
-      if nx > 800
-      then nx - (800 + width)
-      else if nx < -width then nx + 800 + width else nx
-    nny =
-      if ny > 600
-      then ny - (600 + width)
-      else if ny < -width then ny + 600 + width else ny
+update :: Double -> [SDL.Event] -> Affection UserData ()
+update sec evs = do
+  wd <- getAffection
+  smUpdate (state wd) sec
+  mapM_ (smEvent (state wd) sec) evs
 
 draw :: Affection UserData ()
 draw = do

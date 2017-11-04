@@ -1,9 +1,10 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
+
 module Types where
 
 import Affection hiding (StateMachine)
 import qualified SDL
 import GEGL
-import BABL
 import qualified Data.Map as M
 
 data UserData = UserData
@@ -15,7 +16,8 @@ data UserData = UserData
   -- , debris :: ParticleSystem
   , wonlost :: Bool
   , pixelSize :: Int
-  , state :: StateMachine
+  , state :: State
+  , fade :: MenuFade
   }
 
 data Ship = Ship
@@ -37,9 +39,9 @@ data Haskelloid = Haskelloid
 
 data NodeKey
   = KeyRoot
-  | KeyTranslate
-  | KeyRotate
   | KeyShip
+  | KeyShipTranslate
+  | KeyShipRotate
   | KeyPNop
   | KeyHNop
   | KeyCrop
@@ -50,9 +52,19 @@ data NodeKey
   | KeyPixelize
   | KeyFGOver
   | KeyFGNop
+  | KeyFGTrans
+  | KeyMenuHeading
+  | KeyMenuText
+  | KeyMenuStart
+  | KeyMenuHighscore
+  | KeyMenuOver
   deriving (Ord, Eq)
 
-data StateMachine
+data State
   = Menu
   | HighScore
   | InGame
+
+data MenuFade
+  = FadeIn Double
+  | FadeOut Double
