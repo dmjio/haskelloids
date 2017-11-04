@@ -29,6 +29,9 @@ main = withAffection $ AffectionConfig
   , updateLoop     = update
   , loadState      = load
   , cleanUp        = clean
+  , canvasSize     = Nothing
+  , initScreenMode = SDL.Windowed
+  , eventLoop      = handleGameEvent
   }
 
 update :: Double -> Affection UserData ()
@@ -45,13 +48,13 @@ update sec = do
     putAffection pd
       { pixelSize = pixelSize wd -1
       }
-  evs <- SDL.pollEvents
-  mapM_ (\e ->
-    case state wd of
-      InGame ->
-        handleGameEvent sec e
-      _ -> error "not yet implemented"
-    ) evs
+  -- evs <- SDL.pollEvents
+  -- mapM_ (\e ->
+  --   case state wd of
+  --     InGame ->
+  --       handleGameEvent e
+  --     _ -> error "not yet implemented"
+  --   ) evs
   ud2 <- getAffection
   nhs <- mapM (updateHaskelloid sec) (haskelloids ud2)
   -- liftIO $ traceIO $ show $ length nhs
@@ -69,7 +72,7 @@ update sec = do
   liftIO $ gegl_node_set (nodeGraph ud3 M.! KeyRotate) $ Operation "gegl:rotate"
     [ Property "degrees" $ PropertyDouble $ sRot $ ship ud3
     ]
-  ups <- updateParticleSystem (shots ud3) sec shotsUpd shotsDraw
+  ups <- updateParticleSystem (shots ud3) sec shotsUpd
   ud4 <- getAffection
   putAffection ud4
     { ship = (ship ud3)

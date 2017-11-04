@@ -24,8 +24,8 @@ clean ud = do
   mapM_ gegl_node_drop $ map (\h -> hNodeGraph h M.! "root") (haskelloids ud)
   gegl_node_drop $ nodeGraph ud M.! KeyRoot
 
-load :: SDL.Surface -> IO UserData
-load _ = do
+load :: IO UserData
+load = do
   traceM "loading"
   root <- gegl_node_new
   traceM "root node"

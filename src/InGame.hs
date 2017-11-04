@@ -13,11 +13,12 @@ import Debug.Trace
 import Types
 import Commons
 
-handleGameEvent :: Double -> SDL.Event -> Affection UserData ()
-handleGameEvent sec e = do
+handleGameEvent :: SDL.EventPayload -> Affection UserData ()
+handleGameEvent e = do
   ad <- get
   wd <- getAffection
-  case SDL.eventPayload e of
+  sec <- getDelta
+  case e of
     SDL.KeyboardEvent dat ->
       case (SDL.keysymKeycode $ SDL.keyboardEventKeysym dat) of
         SDL.KeycodeLeft -> do
@@ -72,14 +73,14 @@ handleGameEvent sec e = do
                 { particleTimeToLive = 5
                 , particleCreation = elapsedTime ad
                 , particlePosition = (posX, posY)
-                , particleRotation = Rad 0
+                , particleRotation = 0
                 , particleVelocity =
                   -- ( (floor $ -200 * (sin $ toR $ (sRot $ ship ud) + (fst $ sVel $ ship ud)))
                   -- , (floor $ -200 * (cos $ toR $ (sRot $ ship ud) + (snd $ sVel $ ship ud)))
                   ( (floor $ -200 * (sin $ toR $ sRot $ ship ud))
                   , (floor $ -200 * (cos $ toR $ sRot $ ship ud))
                   )
-                , particlePitchRate = Rad 0
+                , particlePitchRate = 0
                 , particleRootNode = tempRoot
                 , particleNodeGraph = M.fromList
                   [ ("root", tempRoot)
@@ -97,7 +98,7 @@ handleGameEvent sec e = do
           when (SDL.keyboardEventKeyMotion dat == SDL.Pressed) $ do
             liftIO $ traceIO "reloading"
             liftIO $ clean wd
-            nd <- liftIO $ load $ drawSurface ad
+            nd <- liftIO $ load
             putAffection nd
         _ -> return ()
     SDL.WindowClosedEvent _ -> do

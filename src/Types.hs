@@ -15,7 +15,7 @@ data UserData = UserData
   -- , debris :: ParticleSystem
   , wonlost :: Bool
   , pixelSize :: Int
-  , state :: StateMachine
+  , state :: State
   }
 
 data Ship = Ship
@@ -52,7 +52,7 @@ data NodeKey
   | KeyFGNop
   deriving (Ord, Eq)
 
-data StateMachine
+data State
   = Menu
   | HighScore
   | InGame
