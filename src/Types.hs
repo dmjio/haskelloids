@@ -4,7 +4,8 @@ module Types where
 
 import Affection
 import qualified SDL
-import NanoVG
+import NanoVG hiding (V2(..))
+import Linear
 
 data UserData = UserData
   { ship :: Ship
@@ -15,7 +16,7 @@ data UserData = UserData
   , pixelSize :: Int
   , state :: State
   , fade :: MenuFade
-  , neno :: Context
+  , nano :: Context
   }
 
 data Ship = Ship

@@ -1,73 +1,71 @@
 module Menu where
 
-import Affection
+import Affection as A
 import qualified SDL
 
 import Debug.Trace
 
-import Types
+import Data.Maybe
 
-handleMenuEvent :: SDL.EventPayload -> Affection UserData ()
-handleMenuEvent e =
-  case e of
-    SDL.KeyboardEvent dat ->
-      case SDL.keysymKeycode $ SDL.keyboardEventKeysym dat of
-        SDL.KeycodeSpace ->
-          when (SDL.keyboardEventKeyMotion dat == SDL.Pressed) $ do
-            ud <- getAffection
-            liftIO $ gegl_node_disconnect (nodeGraph ud M.! KeyFGNop) "input"
-            smLoad InGame
-        _ -> return ()
-    SDL.WindowClosedEvent _ -> do
-      ad <- get
-      put ad
-        { quitEvent = True
-        }
-    _ -> return ()
+import Control.Monad (when)
+import Control.Monad.IO.Class (liftIO)
+
+import qualified Data.Map as M
+
+import NanoVG
+
+-- internal imports
+
+import Types
+import Commons
+
+handleMenuEvent :: (Affection UserData ()) -> [SDL.EventPayload] -> Affection UserData ()
+handleMenuEvent loader es =
+  mapM_ (\e ->
+    case e of
+      SDL.KeyboardEvent dat ->
+        case SDL.keysymKeycode $ SDL.keyboardEventKeysym dat of
+          SDL.KeycodeSpace ->
+            when (SDL.keyboardEventKeyMotion dat == SDL.Pressed) $ do
+              ud <- getAffection
+              loader
+          _ -> return ()
+      SDL.WindowClosedEvent _ -> do
+        ad <- get
+        put ad
+          { quitEvent = True
+          }
+      _ -> return ()
+    ) es
 
 loadMenu :: Affection UserData ()
 loadMenu = do
+  liftIO $ logIO A.Debug "Loading Menu"
   ud <- getAffection
-  liftIO $ gegl_node_connect_to
-    (nodeGraph ud M.! KeyMenuOver)
-    "output"
-    (nodeGraph ud M.! KeyFGOver)
-    "aux"
-  hs <- liftIO $ catMaybes <$> foldM (\acc _ -> do
-    px <- randomRIO (0, 800)
-    py <- randomRIO (0, 600)
-    insertHaskelloid acc Nothing (px, py)
-    ) [] ([0..9] :: [Int])
-  liftIO $ gegl_node_link_many $ map hFlange hs
-  liftIO $ gegl_node_link (last $ map hFlange hs) (nodeGraph ud M.! KeyHNop)
-  -- liftIO $ gegl_node_disconnect (nodeGraph ud M.! KeyPNop) "input"
+  mhaskImage <- liftIO $
+    createImage (nano ud) (FileName "assets/haskelloid.svg") 0
+  when (isNothing mhaskImage) $
+    liftIO $ logIO Error "Failed to load asset haskelloid"
+  hs <- newHaskelloids (fromJust mhaskImage)
   putAffection ud
     { haskelloids = hs
     , fade = FadeIn 1
     , state = Menu
-    , shots = (shots ud)
-      { partSysParts = ParticleStorage Nothing [] }
+    -- , shots = (shots ud)
+    --   { partSysParts = ParticleStorage Nothing [] }
     }
 
 updateMenu :: Double -> Affection UserData ()
 updateMenu sec = do
   ud <- getAffection
-  nhs <- mapM (updateHaskelloid sec) (haskelloids ud)
+  let nhs = map (updateHaskelloid sec) (haskelloids ud)
   case fade ud of
     FadeIn ttl -> do
-      liftIO $ gegl_node_set (nodeGraph ud M.! KeyMenuText) $
-        Operation "gegl:text"
-          [ Property "color" $ PropertyColor $ GEGL.RGBA 1 1 1 (1.1 - ttl)
-          ]
       putAffection ud
         { fade = if (ttl - sec) > 0 then FadeIn (ttl - sec) else FadeOut 1
         , haskelloids = nhs
         }
     FadeOut ttl -> do
-      liftIO $ gegl_node_set (nodeGraph ud M.! KeyMenuText) $
-        Operation "gegl:text"
-          [ Property "color" $ PropertyColor $ GEGL.RGBA 1 1 1 ttl
-          ]
       putAffection ud
         { fade = if (ttl - sec) > 0 then FadeOut (ttl - sec) else FadeIn 1
         , haskelloids = nhs

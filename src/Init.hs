@@ -1,6 +1,6 @@
 module Init where
 
-import Affection
+import Affection as A
 
 import SDL (($=))
 import qualified SDL
@@ -8,9 +8,14 @@ import qualified SDL
 import qualified Data.Set as S
 import Data.Maybe
 
+import Control.Monad (when)
+import Control.Monad.IO.Class (liftIO)
+
 import System.Random
 
-import NanoVG
+import NanoVG hiding (V2(..))
+
+import Linear
 
 -- Internal imports
 
@@ -18,33 +23,19 @@ import Types
 
 load :: IO UserData
 load = do
+  liftIO $ logIO A.Debug "loading state"
+  liftIO $ logIO A.Debug "creating NanoVG context"
   nvgCtx <- createGL3 (S.fromList [Antialias, StencilStrokes])
-  mhaskImage <- createImage nvgCtx "assets/haskelloid.svg" 0
-  mshipImage <- createImage nvgCtx "assets/ship.svg" 0
-  when (isNothing mhasImage || isNothing mshipImage) $
+  liftIO $ logIO A.Debug "load ship image"
+  mshipImage <- createImage nvgCtx (FileName "assets/ship.svg") 0
+  when (isNothing mshipImage) $
     logIO Error "Failed loading image assets"
-  hasks <- mapM (\_ -> do
-    posx <- randomRIO (0, 800)
-    posy <- randomRIO (0, 600)
-    velx <- randomRIO (-10, 10)
-    vely <- randomRIO (-10, 10)
-    rot <- randomRIO (0, 2*pi)
-    pitch <- randomRIO (-pi, pi)
-    div <- randomRIO (1, 2)
-    return Haskelloid
-      (V2 posx posy)
-      (V2 velx vely)
-      rot
-      pitch
-      div
-      (fromJust mhaskImage)
-    ) [1..10]
   return UserData
     { ship = Ship
       { sPos = V2 400 300
       , sVel = V2 0 0
       , sRot = 0
-      , sImg = fromust mshipImage
+      , sImg = fromJust mshipImage
       }
     , haskelloids = []
     , wonlost = Nothing

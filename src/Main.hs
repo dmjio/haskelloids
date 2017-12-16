@@ -5,9 +5,6 @@ import Affection
 import SDL (($=))
 import qualified SDL
 
-import qualified Graphics.Rendering.OpenGL as GL
-import qualified Graphics.GLUtil as GLU
-
 import qualified Data.Map as M
 
 import Linear as L
@@ -25,7 +22,7 @@ main = do
   withAffection AffectionConfig
     { initComponents = All
     , windowTitle    = "Haskelloids"
-    , windowConfig   = defaultWindow
+    , windowConfig   = SDL.defaultWindow
       { SDL.windowOpenGL = Just SDL.defaultOpenGL
         { SDL.glProfile = SDL.Core SDL.Normal 3 3
         }
@@ -37,7 +34,7 @@ main = do
     , eventLoop      = handle
     , updateLoop     = update
     , drawLoop       = draw
-    , cleanUp        = clean
+    , cleanUp        = (\_ -> return ())
     }
 
 update :: Double -> Affection UserData ()
@@ -45,19 +42,20 @@ update sec = do
   ud <- getAffection
   smUpdate (state ud) sec
 
-handle :: SDL.EventPayload -> Affection UserData ()
+handle :: [SDL.EventPayload] -> Affection UserData ()
 handle e = do
   ud <- getAffection
   smEvent (state ud) e
 
 draw :: Affection UserData ()
 draw = do
-  GL.viewport $= (GL.Position 0 0, GL.Size 800 600)
-  ud <- getAffection
-  GL.currentProgram $= (Just . GLU.program $ program sd)
-  let proj = ortho (-1) 1 (-1) 1 (-1) 1
-      view = lookAt
-        (V3 0 0 (-1))
-        (V3 0 0 0)
-        (V3 0 1 0)
-      model = mkTransformation (Quaternion 1 (V3 0 0 0)) (V3 0 0 0)
+  return ()
+  -- GL.viewport $= (GL.Position 0 0, GL.Size 800 600)
+  -- ud <- getAffection
+  -- GL.currentProgram $= (Just . GLU.program $ program sd)
+  -- let proj = ortho (-1) 1 (-1) 1 (-1) 1
+  --     view = lookAt
+  --       (V3 0 0 (-1))
+  --       (V3 0 0 0)
+  --       (V3 0 1 0)
+  --     model = mkTransformation (Quaternion 1 (V3 0 0 0)) (V3 0 0 0)

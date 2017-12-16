@@ -53,12 +53,13 @@ executable haskelloids
   ghc-options:         -Wall
   
   -- Modules included in this executable, other than Main.
-  other-modules:      InGame
-                    , Types 
+  other-modules:      Types 
                     , Commons
                     , StateMachine
                     , Menu
+                    , Init
   
+  default-extensions: OverloadedStrings
   -- LANGUAGE extensions used by modules in this package.
   -- other-extensions:    
   
