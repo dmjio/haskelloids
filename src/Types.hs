@@ -2,63 +2,37 @@
 
 module Types where
 
-import Affection hiding (StateMachine)
+import Affection
 import qualified SDL
-import GEGL
-import qualified Data.Map as M
+import NanoVG
 
 data UserData = UserData
-  { nodeGraph :: M.Map NodeKey GeglNode
-  , ship :: Ship
-  , buffer :: GeglBuffer
+  { ship :: Ship
   , haskelloids :: [Haskelloid]
-  , shots :: ParticleSystem
+  -- , shots :: ParticleSystem
   -- , debris :: ParticleSystem
-  , wonlost :: Bool
+  , wonlost :: Maybe WonLost
   , pixelSize :: Int
   , state :: State
   , fade :: MenuFade
+  , neno :: Context
   }
 
 data Ship = Ship
-  { sPos :: (Double, Double)
-  , sVel :: (Double, Double)
+  { sPos :: V2 Double
+  , sVel :: V2 Double
   , sRot :: Double
-  , sFlange :: GeglNode
+  , sImg :: Image
   }
 
 data Haskelloid = Haskelloid
-  { hPos :: (Double, Double)
-  , hVel :: (Double, Double)
+  { hPos :: V2 Double
+  , hVel :: V2 Double
   , hRot :: Double
   , hPitch :: Double
   , hDiv :: Int
-  , hFlange :: GeglNode
-  , hNodeGraph :: M.Map String GeglNode
+  , hImg :: Image
   } deriving (Eq)
-
-data NodeKey
-  = KeyRoot
-  | KeyShip
-  | KeyShipTranslate
-  | KeyShipRotate
-  | KeyPNop
-  | KeyHNop
-  | KeyCrop
-  | KeyShipOver
-  | KeySink
-  | KeyWon
-  | KeyLost
-  | KeyPixelize
-  | KeyFGOver
-  | KeyFGNop
-  | KeyFGTrans
-  | KeyMenuHeading
-  | KeyMenuText
-  | KeyMenuStart
-  | KeyMenuHighscore
-  | KeyMenuOver
-  deriving (Ord, Eq)
 
 data State
   = Menu
@@ -68,3 +42,8 @@ data State
 data MenuFade
   = FadeIn Double
   | FadeOut Double
+
+data WonLost
+  = Won
+  | Lost
+  deriving (Eq)
