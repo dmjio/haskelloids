@@ -34,7 +34,7 @@ loadMenu = do
   liftIO $ logIO A.Debug "Loading Menu"
   ud <- getAffection
   mhaskImage <- liftIO $
-    createImage (nano ud) (FileName "assets/haskelloid.svg") 0
+    createImage (nano ud) (FileName "assets/haskelloid.png") 0
   when (isNothing mhaskImage) $
     liftIO $ logIO Error "Failed to load asset haskelloid"
   hs <- newHaskelloids (fromJust mhaskImage)
@@ -76,37 +76,6 @@ updateMenu sec = do
 drawMenu :: Affection UserData ()
 drawMenu = do
   ud <- getAffection
-  let V2 sx sy = fmap (CFloat . realToFrac) (sPos $ ship ud)
-  liftIO $ do
-    save (nano ud)
-    sPaint <- imagePattern (nano ud) 400 300 20 20 0 (sImg $ ship ud) 255
-    beginPath (nano ud)
-    rect (nano ud) 400 300 20 20
-    fillPaint (nano ud) sPaint
-    fill (nano ud)
-    restore (nano ud)
-  dt <- getElapsedTime
-  liftIO $
-    drawSpinner (nano ud) 100 100 100 (CFloat $ realToFrac dt)
-
-drawSpinner :: Context -> CFloat -> CFloat -> CFloat -> CFloat -> IO ()
-drawSpinner vg cx cy r t = do
-  let a0 = 0+t*6
-      a1 = pi + t*6
-      r0 = r
-      r1 = r*0.75
-  save vg
-
-  beginPath vg
-  arc vg cx cy r0 a0 a1 CW
-  arc vg cx cy r1 a1 a0 CCW
-  closePath vg
-  let ax = cx+cos a0 * (r0+r1)*0.5
-      ay = cy+sin a0 * (r0+r1)*0.5
-      bx = cx+cos a1 * (r0+r1)*0.5
-      by = cy+sin a1 * (r0+r1)*0.5
-  paint <- linearGradient vg ax ay bx by (rgba 255 255 255 0) (rgba 255 255 255 128)
-  fillPaint vg paint
-  fill vg
-
-  restore vg
+  mapM_ drawHaskelloid (haskelloids ud)
+  -- t <- getElapsedTime
+  -- liftIO $ drawSpinner (nano ud) 100 100 100 t

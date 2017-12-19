@@ -24,17 +24,17 @@ data UserData = UserData
   }
 
 data Ship = Ship
-  { sPos :: V2 Double
-  , sVel :: V2 Double
-  , sRot :: Double
+  { sPos :: V2 Float
+  , sVel :: V2 Float
+  , sRot :: Float
   , sImg :: Image
   }
 
 data Haskelloid = Haskelloid
-  { hPos :: V2 Double
-  , hVel :: V2 Double
-  , hRot :: Double
-  , hPitch :: Double
+  { hPos :: V2 Float
+  , hVel :: V2 Float
+  , hRot :: Float
+  , hPitch :: Float
   , hDiv :: Int
   , hImg :: Image
   } deriving (Eq)
