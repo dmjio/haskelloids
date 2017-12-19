@@ -71,12 +71,3 @@ draw = do
   liftIO $ beginFrame (nano ud) 800 600 (800/600)
   smDraw (state ud)
   liftIO $ endFrame (nano ud)
-  -- GL.viewport $= (GL.Position 0 0, GL.Size 800 600)
-  -- ud <- getAffection
-  -- GL.currentProgram $= (Just . GLU.program $ program sd)
-  -- let proj = ortho (-1) 1 (-1) 1 (-1) 1
-  --     view = lookAt
-  --       (V3 0 0 (-1))
-  --       (V3 0 0 0)
-  --       (V3 0 1 0)
-  --     model = mkTransformation (Quaternion 1 (V3 0 0 0)) (V3 0 0 0)
