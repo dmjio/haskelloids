@@ -25,17 +25,18 @@ import Types
 toR :: Double -> Double
 toR deg = deg * pi / 180
 
-wrapAround :: (Ord t, Num t) => V2 t -> t -> V2 t
+wrapAround :: (Fractional t, Ord t, Num t) => V2 t -> t -> V2 t
 wrapAround (V2 nx ny) width = (V2 nnx nny)
   where
     nnx
-      | nx > 800    = nx - (800 + width)
-      | nx < -width = nx + 800 + width
-      | otherwise   = nx
+      | nx > 800 + half = nx - (800 + width)
+      | nx < -half      = nx + 800 + width
+      | otherwise       = nx
     nny
-      | ny > 600    = ny - (600 + width)
-      | ny < -width = ny + 600 + width
-      | otherwise   = ny
+      | ny > 600 + half = ny - (600 + width)
+      | ny < -half      = ny + 600 + width
+      | otherwise       = ny
+    half = width / 2
 
 newHaskelloids :: Image -> Affection UserData [Haskelloid]
 newHaskelloids img = liftIO $ mapM (\_ -> do
@@ -58,7 +59,9 @@ newHaskelloids img = liftIO $ mapM (\_ -> do
 updateHaskelloid :: Double -> Haskelloid -> Haskelloid
 updateHaskelloid dsec has =
   has
-    { hPos = wrapAround (hPos has + hVel has * V2 sec sec) (100 / fromIntegral (hDiv has))
+    { hPos = wrapAround
+      (hPos has + hVel has * V2 sec sec)
+      (100 / fromIntegral (hDiv has))
     , hRot = hRot has + hPitch has * sec
     }
   where
@@ -75,8 +78,9 @@ drawImage ctx img pos dim rot alpha = do
   let (V2 x y) = fmap CFloat pos
       (V2 w h) = fmap CFloat dim
   save ctx
-  translate ctx x y
+  translate ctx (x + (w/2)) (y + (h/2))
   rotate ctx (degToRad $ CFloat rot)
+  translate ctx (-(w/2)) (-(h/2))
   sPaint <- imagePattern ctx 0 0 w h 0 img (CFloat alpha)
   beginPath ctx
   rect ctx 0 0 w h
@@ -111,4 +115,6 @@ drawSpinner ctx x y cr ct = do
 drawHaskelloid :: Haskelloid -> Affection UserData ()
 drawHaskelloid (Haskelloid pos _ rot _ div img) = do
   ctx <- nano <$> getAffection
-  liftIO $ drawImage ctx img pos (fmap (/ fromIntegral div) (V2 100 100)) rot 255
+  liftIO $ drawImage ctx img (pos - fmap (/2) dim) dim rot 255
+  where
+    dim = (fmap (/ fromIntegral div) (V2 100 100))

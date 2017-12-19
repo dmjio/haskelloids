@@ -48,8 +48,9 @@ update sec = do
 
 handle :: [SDL.EventPayload] -> Affection UserData ()
 handle e = do
-  ud <- getAffection
-  smEvent (state ud) e
+  (Subsystems w k) <- subsystems <$> getAffection
+  _ <- consumeSDLEvents w =<< consumeSDLEvents k e
+  return ()
 
 draw :: Affection UserData ()
 draw = do

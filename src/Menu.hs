@@ -6,13 +6,14 @@ import qualified SDL
 import Debug.Trace
 
 import Data.Maybe
+import qualified Data.Set as S
 
 import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
 
 import qualified Data.Map as M
 
-import NanoVG hiding (V2(..))
+import NanoVG hiding (V2(..), V4(..))
 
 import Linear
 
@@ -77,5 +78,21 @@ drawMenu :: Affection UserData ()
 drawMenu = do
   ud <- getAffection
   mapM_ drawHaskelloid (haskelloids ud)
+  liftIO $ do
+    let ctx = nano ud
+        alpha fio = case fio of
+          FadeIn d  -> (floor (255 * (1 - d)))
+          FadeOut d -> (floor (255 * d))
+    save ctx
+    fontSize ctx 120
+    fontFace ctx "modulo"
+    textAlign ctx (S.fromList [AlignCenter,AlignTop])
+    -- (Bounds (V4 b0 b1 b2 b3)) <- textBoxBounds ctx x y' 150 "HASKELLOIDS"
+    fillColor ctx (rgba 255 255 255 255)
+    textBox ctx 0 200 800 "HASKELLOIDS"
+    fillColor ctx (rgba 255 128 0 (alpha $ fade ud))
+    fontSize ctx 40
+    textBox ctx 0 350 800 "Press [Space] to PLay\nPress [Esc] to exit"
+    restore ctx
   -- t <- getElapsedTime
   -- liftIO $ drawSpinner (nano ud) 100 100 100 t

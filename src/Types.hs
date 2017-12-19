@@ -20,6 +20,7 @@ data UserData = UserData
   , state :: State
   , fade :: MenuFade
   , nano :: Context
+  , font :: Font
   , subsystems :: Subsystems
   }
 

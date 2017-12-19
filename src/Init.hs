@@ -41,6 +41,11 @@ load = do
   when (isNothing mshipImage) $ do
     logIO Error "Failed loading image assets"
     exitFailure
+  mfont <- createFont nvgCtx "modulo" (FileName "assets/Modulo.ttf")
+  when (isNothing mfont) $ do
+    logIO Error "Failed to load font"
+    exitFailure
+  liftIO $ logIO A.Debug "Initializing subsystems"
   subs <- Subsystems
     <$> (return . Window =<< newTVarIO [])
     <*> (return . Keyboard =<< newTVarIO [])
@@ -56,6 +61,7 @@ load = do
     , state = Menu
     , fade = FadeIn 1
     , nano = nvgCtx
+    , font = fromJust mfont
     , subsystems = subs
     }
 

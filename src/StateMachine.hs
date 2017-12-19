@@ -26,10 +26,8 @@ instance StateMachine State UserData where
 
   -- smUpdate InGame sec = updateGame sec
 
-  smEvent Menu = handleMenuEvent (return ()) -- (smLoad InGame)
-
-  -- smEvent InGame = handleGameEvent
-
   smDraw Menu = drawMenu
 
   -- smDraw InGame = drawGame
+
+  smEvent _ _ = return ()
