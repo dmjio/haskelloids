@@ -92,7 +92,7 @@ drawMenu = do
     textBox ctx 0 200 800 "HASKELLOIDS"
     fillColor ctx (rgba 255 128 0 (alpha $ fade ud))
     fontSize ctx 40
-    textBox ctx 0 350 800 "Press [Space] to PLay\nPress [Esc] to exit"
+    textBox ctx 0 350 800 "Press [Space] to Play\nPress [Esc] to exit"
     restore ctx
   -- t <- getElapsedTime
   -- liftIO $ drawSpinner (nano ud) 100 100 100 t
