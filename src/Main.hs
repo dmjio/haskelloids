@@ -10,7 +10,7 @@ import qualified Data.Map as M
 
 import Linear as L
 
-import NanoVG hiding (V2(..))
+import NanoVG hiding (V2(..), V4(..))
 
 import Control.Monad.IO.Class (liftIO)
 
@@ -29,7 +29,8 @@ main = do
     , windowTitle    = "Haskelloids"
     , windowConfig   = SDL.defaultWindow
       { SDL.windowOpenGL = Just SDL.defaultOpenGL
-        { SDL.glProfile          = SDL.Core SDL.Normal 3 3
+        { SDL.glProfile        = SDL.Core SDL.Normal 3 3
+        , SDL.glColorPrecision = V4 8 8 8 8
         }
       }
     , initScreenMode = SDL.Windowed
