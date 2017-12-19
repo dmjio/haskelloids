@@ -59,3 +59,9 @@ updateHaskelloid sec has =
     { hPos = hPos has + hVel has * V2 sec sec
     , hRot = hRot has + hPitch has * sec
     }
+
+clamp :: Ord a => a -> a -> a -> a
+clamp a' low up
+  | a' < low = low
+  | a' > up = up
+  | otherwise = a'

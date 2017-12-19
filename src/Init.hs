@@ -1,3 +1,4 @@
+{-# LANGUAGE ForeignFunctionInterface #-}
 module Init where
 
 import Affection as A
@@ -10,26 +11,39 @@ import Data.Maybe
 
 import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
+import Control.Concurrent.STM
 
 import System.Random
-
-import NanoVG hiding (V2(..))
+import System.Exit (exitFailure)
 
 import Linear
+
+import NanoVG hiding (V2)
+
+import Foreign.C.Types (CInt(..))
 
 -- Internal imports
 
 import Types
 
+foreign import ccall unsafe "glewInit"
+  glewInit :: IO CInt
+
 load :: IO UserData
 load = do
+  liftIO $ logIO A.Debug "init GLEW"
+  _ <- glewInit
   liftIO $ logIO A.Debug "loading state"
-  liftIO $ logIO A.Debug "creating NanoVG context"
-  nvgCtx <- createGL3 (S.fromList [Antialias, StencilStrokes])
+  liftIO $ logIO A.Debug "create context"
+  nvgCtx <- createGL3 (S.fromList [Antialias, StencilStrokes, NanoVG.Debug])
   liftIO $ logIO A.Debug "load ship image"
-  mshipImage <- createImage nvgCtx (FileName "assets/ship.svg") 0
-  when (isNothing mshipImage) $
+  mshipImage <- createImage nvgCtx (FileName "assets/ship.png") 0
+  when (isNothing mshipImage) $ do
     logIO Error "Failed loading image assets"
+    exitFailure
+  subs <- Subsystems
+    <$> (return . Window =<< newTVarIO [])
+    <*> (return . Keyboard =<< newTVarIO [])
   return UserData
     { ship = Ship
       { sPos = V2 400 300
@@ -42,6 +56,7 @@ load = do
     , state = Menu
     , fade = FadeIn 1
     , nano = nvgCtx
+    , subsystems = subs
     }
 
 

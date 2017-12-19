@@ -30,6 +30,6 @@ instance StateMachine State UserData where
 
   -- smEvent InGame = handleGameEvent
 
-  smDraw Menu = return ()
+  smDraw Menu = drawMenu
 
   -- smDraw InGame = drawGame

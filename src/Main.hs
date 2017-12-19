@@ -1,13 +1,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import Affection
+import Affection as A
 import SDL (($=))
 import qualified SDL
 
 import qualified Data.Map as M
 
 import Linear as L
+
+import NanoVG
+
+import Control.Monad.IO.Class (liftIO)
 
 -- internal imports
 
@@ -18,7 +22,7 @@ import Init
 
 main :: IO ()
 main = do
-  logIO Debug "Starting"
+  logIO A.Debug "Starting"
   withAffection AffectionConfig
     { initComponents = All
     , windowTitle    = "Haskelloids"
@@ -49,7 +53,10 @@ handle e = do
 
 draw :: Affection UserData ()
 draw = do
-  return ()
+  ud <- getAffection
+  liftIO $ beginFrame (nano ud) 800 600 (800/600)
+  smDraw (state ud)
+  liftIO $ endFrame (nano ud)
   -- GL.viewport $= (GL.Position 0 0, GL.Size 800 600)
   -- ud <- getAffection
   -- GL.currentProgram $= (Just . GLU.program $ program sd)

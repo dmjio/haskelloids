@@ -51,6 +51,7 @@ executable haskelloids
   -- .hs or .lhs file containing the Main module.
   main-is:             Main.hs
   ghc-options:         -Wall
+  extra-libraries:   GLEW
   
   -- Modules included in this executable, other than Main.
   other-modules:      Types 
@@ -69,8 +70,9 @@ executable haskelloids
                      , sdl2 >= 2.1.3.1
                      , containers
                      , random
-                     , nanovg
                      , linear
+                     , stm
+                     , nanovg
   
   -- Directories containing source files.
   hs-source-dirs:      src
