@@ -22,6 +22,7 @@ data UserData = UserData
   , nano :: Context
   , font :: Font
   , subsystems :: Subsystems
+  , haskImage :: Image
   }
 
 data Ship = Ship

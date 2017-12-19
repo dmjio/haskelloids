@@ -6,6 +6,8 @@ import Affection as A
 import SDL (($=))
 import qualified SDL
 
+import qualified Graphics.Rendering.OpenGL as GL
+
 import qualified Data.Set as S
 import Data.Maybe
 
@@ -31,16 +33,22 @@ foreign import ccall unsafe "glewInit"
 
 load :: IO UserData
 load = do
+  liftIO $ logIO A.Debug "Let's drop some Hhnts for SDL"
+  SDL.HintRenderDriver $= SDL.OpenGL
   liftIO $ logIO A.Debug "init GLEW"
   _ <- glewInit
   liftIO $ logIO A.Debug "loading state"
   liftIO $ logIO A.Debug "create context"
-  nvgCtx <- createGL3 (S.fromList [Antialias, StencilStrokes, NanoVG.Debug])
+  nvgCtx <- createGL3 (S.fromList [Antialias, StencilStrokes])
   liftIO $ logIO A.Debug "load ship image"
   mshipImage <- createImage nvgCtx (FileName "assets/ship.png") 0
   when (isNothing mshipImage) $ do
-    logIO Error "Failed loading image assets"
+    logIO Error "Failed to load asset ship"
     exitFailure
+  mhaskImage <- liftIO $
+    createImage nvgCtx (FileName "assets/haskelloid.png") 0
+  when (isNothing mhaskImage) $
+    liftIO $ logIO Error "Failed to load asset haskelloid"
   mfont <- createFont nvgCtx "modulo" (FileName "assets/Modulo.ttf")
   when (isNothing mfont) $ do
     logIO Error "Failed to load font"
@@ -49,6 +57,9 @@ load = do
   subs <- Subsystems
     <$> (return . Window =<< newTVarIO [])
     <*> (return . Keyboard =<< newTVarIO [])
+  liftIO $ logIO A.Debug "Setting viewport"
+  GL.viewport $= (GL.Position 0 0, GL.Size 800 600)
+  liftIO $ logIO A.Debug "Returning UserData"
   return UserData
     { ship = Ship
       { sPos = V2 400 300
@@ -63,31 +74,5 @@ load = do
     , nano = nvgCtx
     , font = fromJust mfont
     , subsystems = subs
+    , haskImage = fromJust mhaskImage
     }
-
-
-
-  -- _ <- SDL.setMouseLocationMode SDL.RelativeLocation
-  -- GL.depthFunc $= ust GL.Less
-  -- pane <- GL.genObjectName
-  -- GL.BindVertexArrayObject $= Just pane
-  -- verts <- GL.genObejctName
-  -- let vertCoord =
-  --       [ (-1), (-1), 0
-  --       , 1   , (-1), 0
-  --       , (-1), 1   , 0
-  --       , 1   , 1   , 0
-  --       , (-1), 1   , 0
-  --       , 1   , (-1), 0
-  --       ]
-  -- withArray vertCoord $ \ptr
-  --   GL.bufferData GL.ArrayBuffer $=
-  --     ( fromIntegral $ length vertCoord * 3 * sizeOf (0 :: Double)
-  --     , ptr
-  --     , GL.StaticDraw
-  --     )
-  -- GL.vertexAttribPointer (GL.AttribLocation 0) $=
-  --   ( GL.ToFloat
-  --   , GL.VertexArrayDescriptor 4 GL.Float 0 (plusPtr nullPtr 0)
-  --   )
- -- GL.vertexAttribArray (GL.AttribLocation 0) $= GL.Enabled

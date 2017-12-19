@@ -4,12 +4,13 @@ module Main where
 import Affection as A
 import SDL (($=))
 import qualified SDL
+import qualified Graphics.Rendering.OpenGL as GL
 
 import qualified Data.Map as M
 
 import Linear as L
 
-import NanoVG
+import NanoVG hiding (V2(..))
 
 import Control.Monad.IO.Class (liftIO)
 
@@ -28,18 +29,30 @@ main = do
     , windowTitle    = "Haskelloids"
     , windowConfig   = SDL.defaultWindow
       { SDL.windowOpenGL = Just SDL.defaultOpenGL
-        { SDL.glProfile = SDL.Core SDL.Normal 3 3
+        { SDL.glProfile          = SDL.Core SDL.Normal 3 3
         }
       }
     , initScreenMode = SDL.Windowed
     , canvasSize     = Nothing
     , loadState      = load
-    , preLoop        = smLoad Menu
+    , preLoop        = pre >> smLoad Menu
     , eventLoop      = handle
     , updateLoop     = update
     , drawLoop       = draw
     , cleanUp        = (\_ -> return ())
     }
+
+pre :: Affection UserData ()
+pre = do
+  subs <- subsystems <$> getAffection
+  liftIO $ logIO A.Debug "Setting global resize event listener"
+  _ <- partSubscribe (subWindow subs) $ \msg -> case msg of
+    MsgWindowResize _ _ (V2 w h) -> do
+      let nw = floor $ fromIntegral h * (800/600)
+          dw = floor $ (fromIntegral w - fromIntegral nw) / 2
+      GL.viewport $= (GL.Position dw 0, GL.Size nw h)
+    _ -> return ()
+  return ()
 
 update :: Double -> Affection UserData ()
 update sec = do

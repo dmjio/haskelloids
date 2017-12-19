@@ -34,11 +34,7 @@ loadMenu :: Affection UserData ()
 loadMenu = do
   liftIO $ logIO A.Debug "Loading Menu"
   ud <- getAffection
-  mhaskImage <- liftIO $
-    createImage (nano ud) (FileName "assets/haskelloid.png") 0
-  when (isNothing mhaskImage) $
-    liftIO $ logIO Error "Failed to load asset haskelloid"
-  hs <- newHaskelloids (fromJust mhaskImage)
+  hs <- newHaskelloids (haskImage ud)
   _ <- partSubscribe (subKeyboard $ subsystems ud)
     (\kbdev -> case SDL.keysymKeycode (msgKbdKeysym kbdev) of
       SDL.KeycodeEscape -> do
