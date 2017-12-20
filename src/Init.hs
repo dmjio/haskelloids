@@ -33,13 +33,13 @@ foreign import ccall unsafe "glewInit"
 
 load :: IO UserData
 load = do
-  liftIO $ logIO A.Debug "Let's drop some Hhnts for SDL"
-  SDL.HintRenderDriver $= SDL.OpenGL
+  -- liftIO $ logIO A.Debug "Let's drop some Hints for SDL"
+  -- SDL.HintRenderDriver $= SDL.OpenGL
   liftIO $ logIO A.Debug "init GLEW"
   _ <- glewInit
   liftIO $ logIO A.Debug "loading state"
   liftIO $ logIO A.Debug "create context"
-  nvgCtx <- createGL3 (S.fromList [Antialias, StencilStrokes])
+  nvgCtx <- createGL3 (S.fromList [Antialias, StencilStrokes, NanoVG.Debug])
   liftIO $ logIO A.Debug "load ship image"
   mshipImage <- createImage nvgCtx (FileName "assets/ship.png") 0
   when (isNothing mshipImage) $ do

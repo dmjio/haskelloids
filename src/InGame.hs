@@ -7,7 +7,7 @@ import qualified SDL
 import qualified Data.Map as M
 import Data.Maybe (catMaybes, isJust, fromJust, isNothing)
 
-import Control.Monad (when)
+import Control.Monad (when, unless)
 import Control.Monad.IO.Class (liftIO)
 
 import System.Random (randomRIO)
@@ -28,7 +28,7 @@ loadGame stateChange = do
       case SDL.keysymKeycode (msgKbdKeysym kbdev) of
         SDL.KeycodeSpace -> do
           liftIO $ logIO Debug "TODO: PEW!"
-        SDL.KeycodeR -> do
+        SDL.KeycodeR -> unless (msgKbdKeyRepeat kbdev) $ do
           liftIO $ logIO Debug "Reloading"
           putAffection ud
             { stateUUIDs = UUIDClean [] []

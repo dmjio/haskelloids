@@ -29,8 +29,8 @@ main = do
     , windowTitle    = "Haskelloids"
     , windowConfig   = SDL.defaultWindow
       { SDL.windowOpenGL = Just SDL.defaultOpenGL
-        { SDL.glProfile        = SDL.Core SDL.Normal 3 3
-        , SDL.glColorPrecision = V4 8 8 8 8
+        { SDL.glProfile        = SDL.Core SDL.Normal 3 0
+        , SDL.glColorPrecision = V4 0 8 8 8
         }
       }
     , initScreenMode = SDL.Windowed
@@ -70,6 +70,9 @@ handle e = do
 draw :: Affection UserData ()
 draw = do
   ud <- getAffection
+  window <- drawWindow <$> get
+  pf <- liftIO $ SDL.getWindowPixelFormat window
+  liftIO $ logIO A.Debug $ "Window pixel format: " ++ show pf
   liftIO $ beginFrame (nano ud) 800 600 (800/600)
   smDraw (state ud)
   liftIO $ endFrame (nano ud)
