@@ -23,6 +23,7 @@ data UserData = UserData
   , font :: Font
   , subsystems :: Subsystems
   , haskImage :: Image
+  , stateUUIDs :: UUIDClean
   }
 
 data Ship = Ship
@@ -60,6 +61,11 @@ data Subsystems = Subsystems
   , subKeyboard :: Keyboard
   }
 
+data UUIDClean = UUIDClean
+  { uuWindow   :: [MsgId WindowMessage]
+  , uuKeyboard :: [MsgId KeyboardMessage]
+  }
+
 newtype Window = Window (TVar [(UUID, WindowMessage -> Affection UserData ())])
 
 instance Participant Window WindowMessage UserData where
@@ -67,10 +73,16 @@ instance Participant Window WindowMessage UserData where
     subTups <- liftIO $ readTVarIO t
     return $ map snd subTups
 
-  partSubscribe (Window t) = generalSubscribe t
+  partSubscribe (Window t) funct = do
+    uuid <- genUUID
+    liftIO $ atomically $ modifyTVar' t ((uuid, funct) :)
+    return $ MsgId uuid MsgWindowEmptyEvent
 
-  partUnSubscribe (Window t) uuid =
-    liftIO $ atomically $ modifyTVar' t (filter (\(u, _) -> u /= uuid))
+  partUnSubscribe (Window t) (MsgId uuid _) =
+    liftIO $ atomically $ modifyTVar' t (filter (flip filterMsg uuid))
+    where
+      filterMsg :: (UUID, WindowMessage -> Affection UserData ()) -> UUID -> Bool
+      filterMsg (u, _) p = u /= p
 
 instance SDLSubsystem Window UserData where
   consumeSDLEvents = consumeSDLWindowEvents
@@ -82,15 +94,16 @@ instance Participant Keyboard KeyboardMessage UserData where
     subTups <- liftIO $ readTVarIO t
     return $ map snd subTups
 
-  partSubscribe (Keyboard t) = generalSubscribe t
+  partSubscribe (Keyboard t) funct = do
+    uuid <- genUUID
+    liftIO $ atomically $ modifyTVar' t ((uuid, funct) :)
+    return $ MsgId uuid MsgKeyboardEmptyEvent
 
-  partUnSubscribe (Keyboard t) uuid =
-    liftIO $ atomically $ modifyTVar' t (filter (\(u, _) -> u /= uuid))
+  partUnSubscribe (Keyboard t) (MsgId uuid _) =
+    liftIO $ atomically $ modifyTVar' t (filter (flip filterMsg uuid))
+    where
+      filterMsg :: (UUID, KeyboardMessage -> Affection UserData ()) -> UUID -> Bool
+      filterMsg (u, _) p = u /= p
 
 instance SDLSubsystem Keyboard UserData where
   consumeSDLEvents = consumeSDLKeyboardEvents
-
-generalSubscribe t funct = do
-  uuid <- genUUID
-  liftIO $ atomically $ modifyTVar' t ((uuid, funct) :)
-  return uuid

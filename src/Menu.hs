@@ -24,32 +24,27 @@ import Foreign.C.Types
 import Types
 import Commons
 
-handleMenuEvent :: (Affection UserData ()) -> [SDL.EventPayload] -> Affection UserData ()
-handleMenuEvent _ es = do
-  (Subsystems w k) <- subsystems <$> getAffection
-  _ <- consumeSDLEvents w =<< consumeSDLEvents k es
-  return ()
-
-loadMenu :: Affection UserData ()
-loadMenu = do
+loadMenu :: (Affection UserData ()) -> Affection UserData ()
+loadMenu stateChange = do
   liftIO $ logIO A.Debug "Loading Menu"
   ud <- getAffection
-  hs <- newHaskelloids (haskImage ud)
-  _ <- partSubscribe (subKeyboard $ subsystems ud)
-    (\kbdev -> case SDL.keysymKeycode (msgKbdKeysym kbdev) of
-      SDL.KeycodeEscape -> do
-        liftIO $ logIO A.Debug "seeya"
-        quit
-      SDL.KeycodeF -> do
-        when (msgKbdKeyMotion kbdev == SDL.Pressed) $ do
-          liftIO $ logIO A.Debug "screen toggling"
-          toggleScreen
-      _ -> return ()
+  hs <- newHaskelloids
+  kbdUUID <- partSubscribe (subKeyboard $ subsystems ud)
+    (\kbdev -> when (msgKbdKeyMotion kbdev == SDL.Pressed) $
+      case SDL.keysymKeycode (msgKbdKeysym kbdev) of
+        SDL.KeycodeEscape -> do
+          liftIO $ logIO A.Debug "seeya"
+          quit
+        SDL.KeycodeSpace -> do
+          liftIO $ logIO A.Debug "Leaving Menu to Game"
+          stateChange
+        _ -> return ()
       )
   putAffection ud
     { haskelloids = hs
     , fade = FadeIn 1
     , state = Menu
+    , stateUUIDs = UUIDClean [] [kbdUUID]
     -- , shots = (shots ud)
     --   { partSysParts = ParticleStorage Nothing [] }
     }
@@ -83,12 +78,9 @@ drawMenu = do
     fontSize ctx 120
     fontFace ctx "modulo"
     textAlign ctx (S.fromList [AlignCenter,AlignTop])
-    -- (Bounds (V4 b0 b1 b2 b3)) <- textBoxBounds ctx x y' 150 "HASKELLOIDS"
     fillColor ctx (rgba 255 255 255 255)
     textBox ctx 0 200 800 "HASKELLOIDS"
     fillColor ctx (rgba 255 128 0 (alpha $ fade ud))
     fontSize ctx 40
     textBox ctx 0 350 800 "Press [Space] to Play\nPress [Esc] to exit"
     restore ctx
-  -- t <- getElapsedTime
-  -- liftIO $ drawSpinner (nano ud) 100 100 100 t

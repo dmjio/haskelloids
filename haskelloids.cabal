@@ -58,6 +58,7 @@ executable haskelloids
                     , Commons
                     , StateMachine
                     , Menu
+                    , InGame
                     , Init
   
   default-extensions: OverloadedStrings
