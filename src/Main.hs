@@ -12,6 +12,7 @@ import Linear as L
 
 import NanoVG hiding (V2(..), V4(..))
 
+import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
 
 -- internal imports
@@ -29,8 +30,8 @@ main = do
     , windowTitle    = "Haskelloids"
     , windowConfig   = SDL.defaultWindow
       { SDL.windowOpenGL = Just SDL.defaultOpenGL
-        { SDL.glProfile        = SDL.Core SDL.Normal 3 0
-        , SDL.glColorPrecision = V4 0 8 8 8
+        { SDL.glProfile        = SDL.Core SDL.Normal 3 2
+        -- , SDL.glColorPrecision = V4 0 8 8 8
         }
       }
     , initScreenMode = SDL.Windowed
@@ -54,6 +55,13 @@ pre = do
           dw = floor $ (fromIntegral w - fromIntegral nw) / 2
       GL.viewport $= (GL.Position dw 0, GL.Size nw h)
     _ -> return ()
+  _ <- partSubscribe (subKeyboard subs) $ \kbdev ->
+    when (msgKbdKeyMotion kbdev == SDL.Pressed) $
+      case SDL.keysymKeycode (msgKbdKeysym kbdev) of
+        SDL.KeycodeF -> do
+          dt <- getDelta
+          liftIO $ logIO A.Debug $ "FPS: " ++ show (1/dt)
+        _ -> return ()
   return ()
 
 update :: Double -> Affection UserData ()
@@ -70,9 +78,9 @@ handle e = do
 draw :: Affection UserData ()
 draw = do
   ud <- getAffection
-  window <- drawWindow <$> get
-  pf <- liftIO $ SDL.getWindowPixelFormat window
-  liftIO $ logIO A.Debug $ "Window pixel format: " ++ show pf
-  liftIO $ beginFrame (nano ud) 800 600 (800/600)
+  -- window <- drawWindow <$> get
+  -- pf <- liftIO $ SDL.getWindowPixelFormat window
+  -- liftIO $ logIO A.Debug $ "Window pixel format: " ++ show pf
+  liftIO $ beginFrame (nano ud) 800 600 1
   smDraw (state ud)
   liftIO $ endFrame (nano ud)

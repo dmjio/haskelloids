@@ -13,7 +13,7 @@ import Control.Monad.IO.Class (liftIO)
 data UserData = UserData
   { ship :: Ship
   , haskelloids :: [Haskelloid]
-  -- , shots :: ParticleSystem
+  , shots :: [Pew]
   -- , debris :: ParticleSystem
   , wonlost :: Maybe WonLost
   , pixelSize :: Int
@@ -33,6 +33,12 @@ data Ship = Ship
   , sImg :: Image
   }
 
+data Pew = Pew
+  { pPos :: V2 Float
+  , pVel :: V2 Float
+  , pTTL :: Double
+  }
+
 data Haskelloid = Haskelloid
   { hPos :: V2 Float
   , hVel :: V2 Float
@@ -44,7 +50,7 @@ data Haskelloid = Haskelloid
 
 data State
   = Menu
-  | HighScore
+  -- | HighScore
   | InGame
 
 data MenuFade

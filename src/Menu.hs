@@ -80,7 +80,7 @@ drawMenu = do
     textAlign ctx (S.fromList [AlignCenter,AlignTop])
     fillColor ctx (rgba 255 255 255 255)
     textBox ctx 0 200 800 "HASKELLOIDS"
-    fillColor ctx (rgba 255 128 0 (alpha $ fade ud))
+    fillColor ctx (rgba 0 128 255 (alpha $ fade ud))
     fontSize ctx 40
     textBox ctx 0 350 800 "Press [Space] to Play\nPress [Esc] to exit"
     restore ctx

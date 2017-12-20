@@ -3,17 +3,8 @@
 module StateMachine where
 
 import Affection
-import qualified SDL
-
-import qualified Data.Map as M
-import Data.Maybe (catMaybes)
-
-import Control.Monad (foldM, when)
-
-import System.Random (randomRIO)
 
 import Types
-import Commons
 import InGame
 import Menu
 

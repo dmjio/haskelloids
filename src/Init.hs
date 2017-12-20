@@ -68,6 +68,7 @@ load = do
       , sImg = fromJust mshipImage
       }
     , haskelloids = []
+    , shots = []
     , wonlost = Nothing
     , state = Menu
     , fade = FadeIn 1
