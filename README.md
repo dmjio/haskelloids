@@ -33,3 +33,9 @@ If all is well, you can invoke `cabal build` and watch everything come together.
 
 To run the game, just execute the binary `dist/build/haskelloids/haskelloids` in
 your build location.
+
+### Controls
+
+use `W`, `A`, `S` and `D` to move your ship, use `Space` to shoot.
+
+use `O` to togle fullscreen mode.
