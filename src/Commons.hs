@@ -1,192 +1,122 @@
+{-# LANGUAGE RecordWildCards #-}
+
 module Commons where
 
 import Affection
 import qualified SDL
-import GEGL
-import BABL
 
 import qualified Data.Map as M
-import Data.Maybe (catMaybes)
+import Data.List (delete)
+import Data.Maybe (catMaybes, isJust)
 
-import Control.Monad (foldM)
+import Control.Monad (foldM, unless, when)
+import Control.Monad.IO.Class (liftIO)
 
 import System.Random (randomRIO)
 
-import Debug.Trace
+import NanoVG as N hiding (V2(..))
+
+import Linear as L hiding (rotate)
+
+import Foreign.C.Types (CFloat(..))
 
 import Types
 
 toR :: Double -> Double
 toR deg = deg * pi / 180
 
-clean :: UserData -> IO ()
-clean ud = do
-  mapM_ gegl_node_drop $ map (\h -> hNodeGraph h M.! "root") (haskelloids ud)
-  gegl_node_drop $ nodeGraph ud M.! KeyRoot
+wrapAround :: (Fractional t, Ord t, Num t) => V2 t -> t -> V2 t
+wrapAround (V2 nx ny) width = (V2 nnx nny)
+  where
+    nnx
+      | nx > 800 + half = nx - (800 + width)
+      | nx < -half      = nx + 800 + width
+      | otherwise       = nx
+    nny
+      | ny > 600 + half = ny - (600 + width)
+      | ny < -half      = ny + 600 + width
+      | otherwise       = ny
+    half = width / 2
 
-load :: IO UserData
-load = do
-  traceM "loading"
-  root <- gegl_node_new
-  traceM "root node"
-  bg <- gegl_node_new_child root $ Operation "gegl:rectangle"
-    [ Property "x" $ PropertyDouble 0
-    , Property "y" $ PropertyDouble 0
-    , Property "width" $ PropertyDouble 800
-    , Property "height" $ PropertyDouble 600
-    , Property "color" $ PropertyColor $ GEGL.RGBA 0 0 0.1 1
-    ]
-  ship <- gegl_node_new_child root $ Operation "gegl:svg-load"
-    [ Property "path" $ PropertyString "assets/ship.svg"
-    , Property "width" $ PropertyInt 50
-    , Property "height" $ PropertyInt 50
-    ]
-  pnop <- gegl_node_new_child root $ Operation "gegl:nop" []
-  hnop <- gegl_node_new_child root $ Operation "gegl:nop" []
-  fgnop <- gegl_node_new_child root $ Operation "gegl:nop" []
-  sover <- gegl_node_new_child root $ defaultOverOperation
-  hover <- gegl_node_new_child root $ defaultOverOperation
-  pover <- gegl_node_new_child root $ defaultOverOperation
-  bgover <- gegl_node_new_child root $ defaultOverOperation
-  fgover <- gegl_node_new_child root $ defaultOverOperation
-  translate <- gegl_node_new_child root $ Operation "gegl:translate"
-    [ Property "x"        $ PropertyDouble 375
-    , Property "y"        $ PropertyDouble 275
-    , Property "sampler"  $ PropertyInt $ fromEnum GeglSamplerCubic
-    ]
-  fgtranslate <- gegl_node_new_child root $ Operation "gegl:translate"
-    [ Property "x"        $ PropertyDouble 150
-    , Property "y"        $ PropertyDouble 250
-    , Property "sampler"  $ PropertyInt $ fromEnum GeglSamplerCubic
-    ]
-  rotate <- gegl_node_new_child root $ Operation "gegl:rotate"
-    [ Property "origin-x" $ PropertyDouble 25
-    , Property "origin-y" $ PropertyDouble 25
-    , Property "sampler"  $ PropertyInt $ fromEnum GeglSamplerCubic
-    ]
-  crop <- gegl_node_new_child root $ Operation "gegl:crop"
-    [ Property "width" $ PropertyDouble 800
-    , Property "height" $ PropertyDouble 600
-    ]
-  buffer <- gegl_buffer_new (Just $ GeglRectangle 0 0 800 600) =<<
-    babl_format (PixelFormat BABL.RGBA CFfloat)
-  sink <- gegl_node_new_child root $ Operation "gegl:copy-buffer"
-    [ Property "buffer" $ PropertyBuffer buffer
-    ]
-  won <- gegl_node_new_child root $ textOperation
-    [ Property "string" $ PropertyString "YOU WON!"
-    , Property "font"   $ PropertyString "Modulo"
-    , Property "size"   $ PropertyDouble 100
-    , Property "color"  $ PropertyColor $ GEGL.RGBA 1 1 1 1
-    ]
-  lost <- gegl_node_new_child root $ textOperation
-    [ Property "string" $ PropertyString "YOU LOST!"
-    , Property "font"   $ PropertyString "Modulo"
-    , Property "size"   $ PropertyDouble 100
-    , Property "color"  $ PropertyColor $ GEGL.RGBA 1 1 1 1
-    ]
-  vignette <- gegl_node_new_child root $ Operation "gegl:vignette" []
-  -- pixelize <- gegl_node_new_child root $ Operation "gegl:pixelize"
-  pixelize <- gegl_node_new_child root $ Operation "gegl:pixelize"
-    [ Property "size-x" $ PropertyInt 3
-    , Property "size-y" $ PropertyInt 3
-    ]
-  -- vdeg <- gegl_node_new_child root $ Operation "gegl:video-degradation"
-  --   [ Property "pattern" $ PropertyInt 8
-  --   ]
-  gegl_node_link_many [ship, rotate, translate]
-  gegl_node_link_many [bgover, pover, hover, sover, crop, fgover, pixelize, vignette, sink]
-  _ <- gegl_node_connect_to translate "output" sover "aux"
-  _ <- gegl_node_connect_to pnop "output" pover "aux"
-  _ <- gegl_node_connect_to hnop "output" hover "aux"
-  _ <- gegl_node_connect_to bg "output" bgover "aux"
-  liftIO $ gegl_node_link fgnop fgtranslate
-  _ <- gegl_node_connect_to fgtranslate "output" fgover "aux"
-  traceM "nodes complete"
-  myMap <- return $ M.fromList
-    [ (KeyRoot, root)
-    , (KeyTranslate, translate)
-    , (KeyRotate, rotate)
-    , (KeyShip, ship)
-    , (KeyPNop, pnop)
-    , (KeyHNop, hnop)
-    , (KeyCrop, crop)
-    , (KeyShipOver, sover)
-    , (KeySink, sink)
-    , (KeyWon, won)
-    , (KeyLost, lost)
-    , (KeyPixelize, pixelize)
-    , (KeyFGOver, fgover)
-    , (KeyFGNop, fgnop)
-    ]
-  hs <- catMaybes <$> foldM (\acc _ -> do
-    px <- liftIO $ randomRIO (0, 800)
-    py <- liftIO $ randomRIO (0, 600)
-    insertHaskelloid acc Nothing (px, py)
-    ) [] ([0..9] :: [Int])
-  liftIO $ gegl_node_link_many $ map hFlange hs
-  liftIO $ gegl_node_link (last $ map hFlange hs) hnop
-  return $ UserData
-    { nodeGraph = myMap
-    , ship      = Ship
-      { sPos = (375, 275)
-      , sVel = (0, 0)
-      , sRot = 0
-      , sFlange = rotate
-      }
-    , buffer = buffer
-    , shots = ParticleSystem (ParticleStorage Nothing []) pnop buffer
-    , haskelloids = hs
-    , wonlost = False
-    , pixelSize = 3
-    , state = InGame
+newHaskelloids :: Affection UserData [Haskelloid]
+newHaskelloids = do
+  img <- haskImage <$> getAffection
+  liftIO $ mapM (\_ -> do
+    posx <- randomRIO (0, 800)
+    posy <- randomRIO (0, 600)
+    velx <- randomRIO (-10, 10)
+    vely <- randomRIO (-10, 10)
+    rot <- randomRIO (-180, 180)
+    pitch <- randomRIO (-pi, pi)
+    div <- randomRIO (1, 2)
+    return $ Haskelloid
+      (V2 posx posy)
+      (V2 velx vely)
+      rot
+      pitch
+      div
+      img
+    ) [1..10]
+
+updateHaskelloid :: Double -> Haskelloid -> Haskelloid
+updateHaskelloid dsec has =
+  has
+    { hPos = wrapAround
+      (hPos has + hVel has * V2 sec sec)
+      (100 / fromIntegral (hDiv has))
+    , hRot = hRot has + hPitch has * sec
     }
+  where
+    sec = realToFrac dsec
 
-insertHaskelloid :: [Maybe Haskelloid] -> Maybe Int -> (Double, Double) -> IO [Maybe Haskelloid]
-insertHaskelloid hasks split (px, py) = do
-  -- liftIO $ traceIO "inserting haskelloid"
-  vx <- liftIO $ randomRIO (-10, 10)
-  vy <- liftIO $ randomRIO (-10, 10)
-  rdiv <- case split of
-    Nothing -> liftIO $ randomRIO (1, 2)
-    Just x -> return $ x + 1
-  rot <- liftIO $ randomRIO (0, 360)
-  pitch <- liftIO $ randomRIO (-45, 45)
-  tempRoot <- liftIO $ gegl_node_new
-  tempOver <- liftIO $ gegl_node_new_child tempRoot $ defaultOverOperation
-  tempSvg <- gegl_node_new_child tempRoot $ Operation "gegl:svg-load"
-    [ Property "path" $ PropertyString "assets/haskelloid.svg"
-    , Property "width" $ PropertyInt (100 `div` rdiv)
-    , Property "height" $ PropertyInt (100 `div` rdiv)
-    ]
-  tempTrans <- liftIO $ gegl_node_new_child tempRoot $ Operation "gegl:translate"
-    [ Property "x" $ PropertyDouble $ px + (100 / fromIntegral rdiv / 2)
-    , Property "y" $ PropertyDouble $ py + (100 / fromIntegral rdiv / 2)
-    , Property "sampler"  $ PropertyInt $ fromEnum GeglSamplerCubic
-    ]
-  tempRot <- liftIO $ gegl_node_new_child tempRoot $ Operation "gegl:rotate"
-    [ Property "origin-x" $ PropertyDouble (100 / 2 / fromIntegral rdiv)
-    , Property "origin-y" $ PropertyDouble (100 / 2 / fromIntegral rdiv)
-    , Property "degrees" $ PropertyDouble rot
-    , Property "sampler"  $ PropertyInt $ fromEnum GeglSamplerCubic
-    ]
-  liftIO $ gegl_node_link_many [tempSvg, tempRot, tempTrans]
-  _ <- liftIO $ gegl_node_connect_to tempTrans "output" tempOver "aux"
-  return $ Just  Haskelloid
-    { hPos =
-      ( px + (100 / 2 / fromIntegral rdiv)
-      , py + (100 / 2 / fromIntegral rdiv)
-      )
-    , hVel = (vx, vy)
-    , hRot = rot
-    , hPitch = pitch
-    , hDiv = rdiv
-    , hFlange = tempOver
-    , hNodeGraph = M.fromList
-      [ ("root", tempRoot)
-      , ("over", tempOver)
-      , ("svg", tempSvg)
-      , ("trans", tempTrans)
-      , ("rot", tempRot)
-      ]
-    } : hasks
+clamp :: Ord a => a -> a -> a -> a
+clamp a' low up
+  | a' < low = low
+  | a' > up = up
+  | otherwise = a'
+
+drawImage :: Context -> Image -> V2 Float -> V2 Float -> Float -> Float -> IO ()
+drawImage ctx img pos dim rot alpha = do
+  let (V2 x y) = fmap CFloat pos
+      (V2 w h) = fmap CFloat dim
+  save ctx
+  translate ctx (x + (w/2)) (y + (h/2))
+  rotate ctx (degToRad $ CFloat rot)
+  translate ctx (-(w/2)) (-(h/2))
+  sPaint <- imagePattern ctx 0 0 w h 0 img (CFloat alpha)
+  beginPath ctx
+  rect ctx 0 0 w h
+  fillPaint ctx sPaint
+  fill ctx
+  resetTransform ctx
+  restore ctx
+
+drawSpinner :: Context -> Float -> Float -> Float -> Float -> IO ()
+drawSpinner ctx x y cr ct = do
+  let a0 = 0+t*6
+      a1 = pi + t*6
+      r0 = r
+      r1 = r*0.75
+      (cx, cy) = (CFloat x, CFloat y)
+      r = CFloat cr
+      t = CFloat ct
+  save ctx
+  beginPath ctx
+  arc ctx cx cy r0 a0 a1 CW
+  arc ctx cx cy r1 a1 a0 CCW
+  closePath ctx
+  let ax = cx+cos a0 * (r0+r1)*0.5
+      ay = cy+sin a0 * (r0+r1)*0.5
+      bx = cx+cos a1 * (r0+r1)*0.5
+      by = cy+sin a1 * (r0+r1)*0.5
+  paint <- linearGradient ctx ax ay bx by (rgba 255 255 255 0) (rgba 255 255 255 128)
+  fillPaint ctx paint
+  fill ctx
+  restore ctx
+
+drawHaskelloid :: Haskelloid -> Affection UserData ()
+drawHaskelloid (Haskelloid pos _ rot _ div img) = do
+  ctx <- nano <$> getAffection
+  liftIO $ drawImage ctx img (pos - fmap (/2) dim) dim rot 255
+  where
+    dim = (fmap (/ fromIntegral div) (V2 100 100))

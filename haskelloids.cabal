@@ -51,23 +51,31 @@ executable haskelloids
   -- .hs or .lhs file containing the Main module.
   main-is:             Main.hs
   ghc-options:         -Wall
+  extra-libraries:   GLEW
   
   -- Modules included in this executable, other than Main.
-  other-modules:      InGame
-                    , Types 
+  other-modules:      Types 
                     , Commons
+                    , StateMachine
+                    , Menu
+                    , InGame
+                    , Init
   
+  default-extensions: OverloadedStrings
   -- LANGUAGE extensions used by modules in this package.
   -- other-extensions:    
   
   -- Other library packages from which modules are imported.
   build-depends:       base >=4.9 && <4.11
-                     , affection
-                     , gegl
-                     , babl
-                     , sdl2
+                     , affection <= 0.0.0.7
+                     , sdl2 >= 2.1.3.1
+                     , OpenGL
+
                      , containers
                      , random
+                     , linear
+                     , stm
+                     , nanovg
   
   -- Directories containing source files.
   hs-source-dirs:      src

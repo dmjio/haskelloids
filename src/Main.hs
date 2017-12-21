@@ -1,233 +1,87 @@
-{-# LANGUAGE OverloadedStrings, RecordWildCards #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import Affection
+import Affection as A
+import SDL (($=))
 import qualified SDL
-import GEGL
+import qualified Graphics.Rendering.OpenGL as GL
 
-import Data.List (delete)
 import qualified Data.Map as M
-import Data.Maybe (catMaybes)
 
-import Control.Monad (when, foldM)
+import Linear as L
 
-import Debug.Trace
+import NanoVG hiding (V2(..), V4(..))
+
+import Control.Monad (when)
+import Control.Monad.IO.Class (liftIO)
 
 -- internal imports
 
 import Types
-import InGame
 import Commons
+import StateMachine ()
+import Init
 
 main :: IO ()
-main = withAffection $ AffectionConfig
-  { initComponents = All
-  , windowTitle    = "Haskelloids"
-  , windowConfig   = defaultWindow
-  , preLoop        = return ()
-  , drawLoop       = draw
-  , updateLoop     = update
-  , loadState      = load
-  , cleanUp        = clean
-  , canvasSize     = Nothing
-  , initScreenMode = SDL.Windowed
-  , eventLoop      = handleGameEvent
-  }
+main = do
+  logIO A.Debug "Starting"
+  withAffection AffectionConfig
+    { initComponents = All
+    , windowTitle    = "Haskelloids"
+    , windowConfig   = SDL.defaultWindow
+      { SDL.windowOpenGL = Just SDL.defaultOpenGL
+        { SDL.glProfile        = SDL.Core SDL.Normal 3 2
+        , SDL.glColorPrecision = V4 8 8 8 1
+        }
+      }
+    , initScreenMode = SDL.Windowed
+    , canvasSize     = Nothing
+    , loadState      = load
+    , preLoop        = pre >> smLoad Menu
+    , eventLoop      = handle
+    , updateLoop     = update
+    , drawLoop       = draw
+    , cleanUp        = (\_ -> return ())
+    }
+
+pre :: Affection UserData ()
+pre = do
+  subs <- subsystems <$> getAffection
+  liftIO $ logIO A.Debug "Setting global resize event listener"
+  _ <- partSubscribe (subWindow subs) $ \msg -> case msg of
+    MsgWindowResize _ _ (V2 w h) -> do
+      liftIO $ logIO A.Debug "Window has been resized"
+      let nw = floor $ fromIntegral h * (800/600)
+          dw = floor $ (fromIntegral w - fromIntegral nw) / 2
+      GL.viewport $= (GL.Position dw 0, GL.Size nw h)
+    _ -> return ()
+  _ <- partSubscribe (subKeyboard subs) $ \kbdev ->
+    when (msgKbdKeyMotion kbdev == SDL.Pressed) $
+      case SDL.keysymKeycode (msgKbdKeysym kbdev) of
+        SDL.KeycodeF -> do
+          dt <- getDelta
+          liftIO $ logIO A.Debug $ "FPS: " ++ show (1/dt)
+        SDL.KeycodeO -> toggleScreen
+        _ -> return ()
+  return ()
 
 update :: Double -> Affection UserData ()
 update sec = do
-  -- traceM $ (show $ 1 / sec) ++ " FPS"
-  ad <- get
-  wd <- getAffection
-  when (((floor $ elapsedTime ad :: Int) * 100) `mod` 10 < 2 && pixelSize wd > 3) $ do
-    liftIO $ gegl_node_set (nodeGraph wd M.! KeyPixelize) $ Operation "gegl:pixelize"
-      [ Property "size-x" $ PropertyInt $ pixelSize wd - 1
-      , Property "size-y" $ PropertyInt $ pixelSize wd - 1
-      ]
-    pd <- getAffection
-    putAffection pd
-      { pixelSize = pixelSize wd -1
-      }
-  -- evs <- SDL.pollEvents
-  -- mapM_ (\e ->
-  --   case state wd of
-  --     InGame ->
-  --       handleGameEvent e
-  --     _ -> error "not yet implemented"
-  --   ) evs
-  ud2 <- getAffection
-  nhs <- mapM (updateHaskelloid sec) (haskelloids ud2)
-  -- liftIO $ traceIO $ show $ length nhs
-  putAffection ud2
-    { haskelloids = nhs
-    }
-  ud3 <- getAffection
-  let nx = fst (sPos $ ship ud3) + (fst (sVel $ ship ud3)) * sec
-      ny = snd (sPos $ ship ud3) + (snd (sVel $ ship ud3)) * sec
-      (nnx, nny) = wrapAround (nx, ny) 50
-  liftIO $ gegl_node_set (nodeGraph ud3 M.! KeyTranslate) $ Operation "gegl:translate"
-    [ Property "x" $ PropertyDouble $ nnx
-    , Property "y" $ PropertyDouble $ nny
-    ]
-  liftIO $ gegl_node_set (nodeGraph ud3 M.! KeyRotate) $ Operation "gegl:rotate"
-    [ Property "degrees" $ PropertyDouble $ sRot $ ship ud3
-    ]
-  ups <- updateParticleSystem (shots ud3) sec shotsUpd
-  ud4 <- getAffection
-  putAffection ud4
-    { ship = (ship ud3)
-      { sPos = (nnx, nny)
-      }
-    , shots = ups
-    }
+  ud <- getAffection
+  smUpdate (state ud) sec
 
-wrapAround :: (Ord t, Num t) => (t, t) -> t -> (t, t)
-wrapAround (nx, ny) width = (nnx, nny)
-  where
-    nnx =
-      if nx > 800
-      then nx - (800 + width)
-      else if nx < -width then nx + 800 + width else nx
-    nny =
-      if ny > 600
-      then ny - (600 + width)
-      else if ny < -width then ny + 600 + width else ny
+handle :: [SDL.EventPayload] -> Affection UserData ()
+handle e = do
+  (Subsystems w k) <- subsystems <$> getAffection
+  _ <- consumeSDLEvents w =<< consumeSDLEvents k e
+  return ()
 
 draw :: Affection UserData ()
 draw = do
   ud <- getAffection
-  liftIO $ gegl_node_process $ nodeGraph ud M.! KeySink
-  -- mintr <- liftIO $ gegl_rectangle_intersect
-  --   (GeglRectangle 0 0 800 600)
-  --   (GeglRectangle (floor $ fst $ sPos $ ship ud) (floor $ snd $ sPos $ ship ud) 50 50)
-  -- maybe (return ()) (\intr ->
-  --   present
-  --     (GeglRectangle (floor $ fst $ sPos $ ship ud) (floor $ snd $ sPos $ ship ud) 50 50)
-  --     (buffer ud)
-  --     False
-  --   ) mintr
-  -- XXX: above part crashes regularly for no apparent reason
-  present
-    (GeglRectangle 0 0 800 600)
-    (buffer ud)
-    True
-
-shotsUpd :: Double -> Particle -> Affection UserData Particle
-shotsUpd sec part@Particle{..} = do
-  let newX = (fst particlePosition) + sec * (fromIntegral $ fst particleVelocity)
-      newY = (snd particlePosition) + sec * (fromIntegral $ snd particleVelocity)
-      (nnx, nny) = wrapAround (newX, newY) 4
-  liftIO $ gegl_node_set (particleNodeGraph M.! "rect") $ Operation "gegl:rectangle"
-    [ Property "x" $ PropertyDouble $ nnx
-    , Property "y" $ PropertyDouble $ nny
-    ]
-  ud <- getAffection
-  inters <- catMaybes <$> mapM (\h -> do
-    col <- liftIO $ gegl_rectangle_intersect
-      (GeglRectangle (floor nnx) (floor nny) 4 4)
-      (GeglRectangle
-        (floor $ fst $ hPos h)
-        (floor $ snd $ hPos h)
-        (100 `div` hDiv h)
-        (100 `div` hDiv h)
-        )
-    case col of
-      Just _ -> return $ Just h
-      Nothing -> return Nothing
-    ) (haskelloids ud)
-  when (not $ null inters) $
-    haskelloidShotDown $ head inters
-  lost <- liftIO $ gegl_rectangle_intersect
-    (GeglRectangle (floor nnx) (floor nny) 4 4)
-    (GeglRectangle
-      (floor $ fst $ sPos $ ship ud)
-      (floor $ snd $ sPos $ ship ud)
-      50
-      50
-      )
-  maybe (return ()) (\_ ->
-    lose
-    ) lost
-  return part
-    { particlePosition = (nnx, nny)
-    , particleTimeToLive = if (not $ null inters) then 0 else particleTimeToLive
-    }
-
-haskelloidShotDown :: Haskelloid -> Affection UserData ()
-haskelloidShotDown h = do
-  liftIO $ gegl_node_drop $ hNodeGraph h M.! "root"
-  ud <- getAffection
-  let redHaskelloids = delete h (haskelloids ud)
-  liftIO $ gegl_node_drop $ hNodeGraph h M.! "root"
-  newHaskelloids <- catMaybes <$> foldM
-    (\acc _ ->
-      if hDiv h < 4
-      then
-        liftIO $ insertHaskelloid acc (Just $ hDiv h) $ hPos h
-      else
-        return $ Nothing : acc
-      )
-    (map Just redHaskelloids) ([0..1] :: [Int])
-  liftIO $ gegl_node_link_many $ map hFlange newHaskelloids
-  if not $ null newHaskelloids
-  then 
-    liftIO $ gegl_node_link
-      (last $ map hFlange newHaskelloids)
-      (nodeGraph ud M.! KeyHNop)
-  else do
-    liftIO $ traceIO "YOU WON!"
-    liftIO $ gegl_node_link
-      (nodeGraph ud M.! KeyWon)
-      (nodeGraph ud M.! KeyFGNop)
-    putAffection ud
-      { wonlost = True
-      }
-  putAffection ud
-    { haskelloids = newHaskelloids
-    }
-
-shotsDraw :: GeglBuffer -> GeglNode -> Particle -> Affection UserData ()
-shotsDraw _ _ _ = return ()
-
-updateHaskelloid :: Double -> Haskelloid -> Affection UserData Haskelloid
-updateHaskelloid sec h@Haskelloid{..} = do
-  let newX = (fst $ hPos) + sec * (fst $ hVel)
-      newY = (snd $ hPos) + sec * (snd $ hVel)
-      newRot = hRot + hPitch * sec
-      (nnx, nny) = wrapAround (newX, newY) (100 / fromIntegral hDiv)
-  liftIO $ gegl_node_set (hNodeGraph M.! "trans") $ Operation "gegl:translate"
-    [ Property "x" $ PropertyDouble $ nnx
-    , Property "y" $ PropertyDouble $ nny
-    ]
-  liftIO $ gegl_node_set (hNodeGraph M.! "rot") $ Operation "gegl:rotate"
-    [ Property "degrees" $ PropertyDouble newRot
-    ]
-  ud <- getAffection
-  lost <- liftIO $ gegl_rectangle_intersect
-    (GeglRectangle (floor nnx) (floor nny) (100 `div` hDiv) (100 `div` hDiv))
-    (GeglRectangle
-      (floor $ fst $ sPos $ ship ud)
-      (floor $ snd $ sPos $ ship ud)
-      50
-      50
-      )
-  maybe (return ()) (\_ ->
-    lose
-    ) lost
-  return h
-    { hPos = (nnx, nny)
-    , hRot = newRot
-    }
-
-lose :: Affection UserData ()
-lose = do
-  ud <- getAffection
-  liftIO $ traceIO "YOU LOST!"
-  _ <- liftIO $ gegl_node_link
-    (nodeGraph ud M.! KeyLost)
-    (nodeGraph ud M.! KeyFGNop)
-  putAffection ud
-    { wonlost = True
-    }
-  _ <- liftIO $ gegl_node_disconnect (nodeGraph ud M.! KeyShipOver) "aux"
-  return ()
+  -- window <- drawWindow <$> get
+  -- pf <- liftIO $ SDL.getWindowPixelFormat window
+  -- liftIO $ logIO A.Debug $ "Window pixel format: " ++ show pf
+  liftIO $ beginFrame (nano ud) 800 600 1
+  smDraw (state ud)
+  liftIO $ endFrame (nano ud)
