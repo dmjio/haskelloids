@@ -35,6 +35,7 @@ load :: IO UserData
 load = do
   -- liftIO $ logIO A.Debug "Let's drop some Hints for SDL"
   -- SDL.HintRenderDriver $= SDL.OpenGL
+  GL.clearColor $= GL.Color4 0 0 0.1 1
   liftIO $ logIO A.Debug "init GLEW"
   _ <- glewInit
   liftIO $ logIO A.Debug "loading state"

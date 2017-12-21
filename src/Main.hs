@@ -84,4 +84,17 @@ draw = do
   -- liftIO $ logIO A.Debug $ "Window pixel format: " ++ show pf
   liftIO $ beginFrame (nano ud) 800 600 1
   smDraw (state ud)
+  drawVignette
   liftIO $ endFrame (nano ud)
+
+drawVignette :: Affection UserData ()
+drawVignette = do
+  ctx <- nano <$> getAffection
+  liftIO $ do
+    save ctx
+    beginPath ctx
+    grad <- boxGradient ctx 200 150 400 300 0 500 (rgba 0 0 0 0) (rgba 0 0 0 255)
+    rect ctx 0 0 800 600
+    fillPaint ctx grad
+    fill ctx
+    restore ctx
