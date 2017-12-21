@@ -37,7 +37,7 @@ data Pew = Pew
   { pPos :: V2 Float
   , pVel :: V2 Float
   , pTTL :: Double
-  }
+  } deriving (Eq)
 
 data Haskelloid = Haskelloid
   { hPos :: V2 Float

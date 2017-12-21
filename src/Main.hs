@@ -31,7 +31,7 @@ main = do
     , windowConfig   = SDL.defaultWindow
       { SDL.windowOpenGL = Just SDL.defaultOpenGL
         { SDL.glProfile        = SDL.Core SDL.Normal 3 2
-        -- , SDL.glColorPrecision = V4 0 8 8 8
+        , SDL.glColorPrecision = V4 8 8 8 1
         }
       }
     , initScreenMode = SDL.Windowed
@@ -61,6 +61,7 @@ pre = do
         SDL.KeycodeF -> do
           dt <- getDelta
           liftIO $ logIO A.Debug $ "FPS: " ++ show (1/dt)
+        SDL.KeycodeO -> toggleScreen
         _ -> return ()
   return ()
 

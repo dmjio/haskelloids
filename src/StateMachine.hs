@@ -11,7 +11,7 @@ import Menu
 instance StateMachine State UserData where
   smLoad Menu = loadMenu (smClean Menu >> smLoad InGame)
 
-  smLoad InGame = loadGame (smClean InGame >> smLoad Menu)
+  smLoad InGame = loadGame (smClean InGame >> smLoad Menu) (smClean InGame >> smLoad InGame)
 
   smUpdate Menu = updateMenu
 
