@@ -17,7 +17,7 @@ development libraries:
 * libglew
 
 You will also need the engine package itself, which can be obtained at
-[its own repo](https://github.com/nek0/affection). YOu cann add it to your
+[its own repo](https://github.com/nek0/affection). You cann add it to your
 by invoking `cabal sandbox add-source <path>`.
 
 To install all haskell package dependencies, invoke
