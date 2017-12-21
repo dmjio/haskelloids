@@ -56,8 +56,8 @@ load = do
     exitFailure
   liftIO $ logIO A.Debug "Initializing subsystems"
   subs <- Subsystems
-    <$> (return . Window =<< newTVarIO [])
-    <*> (return . Keyboard =<< newTVarIO [])
+    <$> (Window <$> newTVarIO [])
+    <*> (Keyboard <$> newTVarIO [])
   liftIO $ logIO A.Debug "Setting viewport"
   GL.viewport $= (GL.Position 0 0, GL.Size 800 600)
   liftIO $ logIO A.Debug "Returning UserData"

@@ -1,5 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-
 module Commons where
 
 import Affection
@@ -26,7 +24,7 @@ toR :: Double -> Double
 toR deg = deg * pi / 180
 
 wrapAround :: (Fractional t, Ord t, Num t) => V2 t -> t -> V2 t
-wrapAround (V2 nx ny) width = (V2 nnx nny)
+wrapAround (V2 nx ny) width = V2 nnx nny
   where
     nnx
       | nx > 800 + half = nx - (800 + width)
@@ -119,4 +117,4 @@ drawHaskelloid (Haskelloid pos _ rot _ div img) = do
   ctx <- nano <$> getAffection
   liftIO $ drawImage ctx img (pos - fmap (/2) dim) dim rot 255
   where
-    dim = (fmap (/ fromIntegral div) (V2 100 100))
+    dim = fmap (/ fromIntegral div) (V2 100 100)

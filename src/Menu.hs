@@ -24,7 +24,7 @@ import Foreign.C.Types
 import Types
 import Commons
 
-loadMenu :: (Affection UserData ()) -> Affection UserData ()
+loadMenu :: Affection UserData () -> Affection UserData ()
 loadMenu stateChange = do
   liftIO $ logIO A.Debug "Loading Menu"
   ud <- getAffection
@@ -54,12 +54,12 @@ updateMenu sec = do
   ud <- getAffection
   let nhs = map (updateHaskelloid sec) (haskelloids ud)
   case fade ud of
-    FadeIn ttl -> do
+    FadeIn ttl ->
       putAffection ud
         { fade = if (ttl - sec) > 0 then FadeIn (ttl - sec) else FadeOut 1
         , haskelloids = nhs
         }
-    FadeOut ttl -> do
+    FadeOut ttl ->
       putAffection ud
         { fade = if (ttl - sec) > 0 then FadeOut (ttl - sec) else FadeIn 1
         , haskelloids = nhs
@@ -72,8 +72,8 @@ drawMenu = do
   liftIO $ do
     let ctx = nano ud
         alpha fio = case fio of
-          FadeIn d  -> (floor (255 * (1 - d)))
-          FadeOut d -> (floor (255 * d))
+          FadeIn d  -> floor (255 * (1 - d))
+          FadeOut d -> floor (255 * d)
     save ctx
     fontSize ctx 120
     fontFace ctx "modulo"

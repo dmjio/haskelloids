@@ -41,7 +41,7 @@ main = do
     , eventLoop      = handle
     , updateLoop     = update
     , drawLoop       = draw
-    , cleanUp        = (\_ -> return ())
+    , cleanUp        = \_ -> return ()
     }
 
 pre :: Affection UserData ()

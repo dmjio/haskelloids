@@ -77,8 +77,8 @@ shoot = do
   ud <- getAffection
   let Ship{..} = ship ud
       npew = Pew ppos pVel pewTTL
-      ppos = sPos + ((V2 0 25) `rotVec` sRot)
-      pVel = sVel + ((V2 0 pewVel) `rotVec` sRot)
+      ppos = sPos + (V2 0 25 `rotVec` sRot)
+      pVel = sVel + (V2 0 pewVel `rotVec` sRot)
   putAffection ud
     { shots = npew : shots ud
     }
@@ -88,7 +88,7 @@ accelShip vel = do
   ud <- getAffection
   dt <- getDelta
   let s    = ship ud
-      nVel = sVel s + fmap (realToFrac dt *) ((V2 0 vel) `rotVec` sRot s)
+      nVel = sVel s + fmap (realToFrac dt *) (V2 0 vel `rotVec` sRot s)
   putAffection ud
     { ship = s
       { sVel = nVel
@@ -101,15 +101,15 @@ rotateShip deg = do
   dt <- getDelta
   putAffection ud
     { ship = (ship ud)
-      { sRot = (sRot $ ship ud) - deg * realToFrac dt
+      { sRot = sRot (ship ud) - deg * realToFrac dt
       }
     }
 
 rotVec :: (Num a, Floating a) => V2 a -> a -> V2 a
 rotVec (V2 x y) deg = V2 nx ny
   where
-    nx   = x * (cos $ dtor deg) + y * (sin $ dtor deg)
-    ny   = x * (sin $ dtor deg) - y * (cos $ dtor deg)
+    nx   = x * cos (dtor deg) + y * sin (dtor deg)
+    ny   = x * sin (dtor deg) - y * cos (dtor deg)
     dtor = (pi / 180 *)
 
 updateGame :: Double -> Affection UserData ()
@@ -162,7 +162,7 @@ checkShotDown =
       let ndiv = hDiv + 1
       if ndiv > 5
       then return []
-      else return $
+      else return
         [ Haskelloid hPos (V2 n1velx n1vely) n1rot n1pitch ndiv hImg
         , Haskelloid hPos (V2 n2velx n2vely) n2rot n2pitch ndiv hImg
         ]
@@ -211,36 +211,34 @@ drawGame = do
   mapM_ drawHaskelloid (haskelloids ud)
   mapM_ drawPew (shots ud)
   case wonlost ud of
-    Just Lost -> liftIO $ do
-      let ctx = nano ud
-      save ctx
-      fontSize ctx 120
-      fontFace ctx "modulo"
-      textAlign ctx (S.fromList [AlignCenter,AlignTop])
-      fillColor ctx (rgba 255 255 255 255)
-      textBox ctx 0 200 800 "YOU LOST!"
-      fillColor ctx (rgba 255 128 0 255)
-      fontSize ctx 40
-      textBox ctx 0 350 800 "Press [Esc] to exit\nPress [R] to try again"
-      restore ctx
-    Just Won -> liftIO $ do
-      let ctx = nano ud
-      save ctx
-      fontSize ctx 120
-      fontFace ctx "modulo"
-      textAlign ctx (S.fromList [AlignCenter,AlignTop])
-      fillColor ctx (rgba 255 255 255 255)
-      textBox ctx 0 200 800 "YOU WON!"
-      fillColor ctx (rgba 128 255 0 255)
-      fontSize ctx 40
-      textBox ctx 0 350 800 "Press [Esc] to exit\nPress [R] to try again"
-      restore ctx
+    Just x -> drawWonLost x
     Nothing -> drawShip (ship ud)
+
+drawWonLost :: WonLost -> Affection UserData ()
+drawWonLost wl = do
+  ctx <- nano <$> getAffection
+  liftIO $ do
+    let color = case wl of
+          Won -> rgba 128 255 0 255
+          Lost -> rgba 255 128 0 255
+        text = case wl of
+          Won -> "YOU WON!"
+          Lost -> "YOU LOsT!"
+    save ctx
+    fontSize ctx 120
+    fontFace ctx "modulo"
+    textAlign ctx (S.fromList [AlignCenter,AlignTop])
+    fillColor ctx (rgba 255 255 255 255)
+    textBox ctx 0 200 800 text
+    fillColor ctx color
+    fontSize ctx 40
+    textBox ctx 0 350 800 "Press [Esc] to exit\nPress [R] to try again"
+    restore ctx
 
 drawShip :: Ship -> Affection UserData ()
 drawShip Ship{..} = do
   ctx <- nano <$> getAffection
-  liftIO $ drawImage ctx (sImg) (sPos - fmap (/2) dim) dim sRot 255
+  liftIO $ drawImage ctx sImg (sPos - fmap (/2) dim) dim sRot 255
   where
     dim = V2 40 40
 

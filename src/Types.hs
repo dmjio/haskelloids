@@ -85,7 +85,7 @@ instance Participant Window WindowMessage UserData where
     return $ MsgId uuid MsgWindowEmptyEvent
 
   partUnSubscribe (Window t) (MsgId uuid _) =
-    liftIO $ atomically $ modifyTVar' t (filter (flip filterMsg uuid))
+    liftIO $ atomically $ modifyTVar' t (filter (`filterMsg` uuid))
     where
       filterMsg :: (UUID, WindowMessage -> Affection UserData ()) -> UUID -> Bool
       filterMsg (u, _) p = u /= p
@@ -106,7 +106,7 @@ instance Participant Keyboard KeyboardMessage UserData where
     return $ MsgId uuid MsgKeyboardEmptyEvent
 
   partUnSubscribe (Keyboard t) (MsgId uuid _) =
-    liftIO $ atomically $ modifyTVar' t (filter (flip filterMsg uuid))
+    liftIO $ atomically $ modifyTVar' t (filter (`filterMsg` uuid))
     where
       filterMsg :: (UUID, KeyboardMessage -> Affection UserData ()) -> UUID -> Bool
       filterMsg (u, _) p = u /= p
