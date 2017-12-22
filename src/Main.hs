@@ -6,8 +6,6 @@ import SDL (($=))
 import qualified SDL
 import qualified Graphics.Rendering.OpenGL as GL
 
-import qualified Data.Map as M
-
 import Linear as L
 
 import NanoVG hiding (V2(..), V4(..))
@@ -18,7 +16,6 @@ import Control.Monad.IO.Class (liftIO)
 -- internal imports
 
 import Types
-import Commons
 import StateMachine ()
 import Init
 
@@ -51,8 +48,8 @@ pre = do
   _ <- partSubscribe (subWindow subs) $ \msg -> case msg of
     MsgWindowResize _ _ (V2 w h) -> do
       liftIO $ logIO A.Debug "Window has been resized"
-      let nw = floor $ fromIntegral h * (800/600)
-          dw = floor $ (fromIntegral w - fromIntegral nw) / 2
+      let nw = floor $ (fromIntegral h * (800/600) :: Double)
+          dw = floor $ ((fromIntegral w - fromIntegral nw) / 2 :: Double)
       GL.viewport $= (GL.Position dw 0, GL.Size nw h)
     _ -> return ()
   _ <- partSubscribe (subKeyboard subs) $ \kbdev ->

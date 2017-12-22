@@ -1,13 +1,7 @@
 module Commons where
 
 import Affection
-import qualified SDL
 
-import qualified Data.Map as M
-import Data.List (delete)
-import Data.Maybe (catMaybes, isJust)
-
-import Control.Monad (foldM, unless, when)
 import Control.Monad.IO.Class (liftIO)
 
 import System.Random (randomRIO)
@@ -24,25 +18,25 @@ toR :: Double -> Double
 toR deg = deg * pi / 180
 
 wrapAround :: (Fractional t, Ord t, Num t) => V2 t -> t -> V2 t
-wrapAround (V2 nx ny) width = V2 nnx nny
+wrapAround (V2 nx ny) w = V2 nnx nny
   where
     nnx
-      | nx > 800 + half = nx - (800 + width)
-      | nx < -half      = nx + 800 + width
+      | nx > 800 + half = nx - (800 + w)
+      | nx < -half      = nx + 800 + w
       | otherwise       = nx
     nny
-      | ny > 600 + half = ny - (600 + width)
-      | ny < -half      = ny + 600 + width
+      | ny > 600 + half = ny - (600 + w)
+      | ny < -half      = ny + 600 + w
       | otherwise       = ny
-    half = width / 2
+    half = w / 2
 
 newHaskelloids :: Affection UserData [Haskelloid]
 newHaskelloids =
   do
   img <- haskImage <$> getAffection
   liftIO $ mapM (\_ -> do
-    div <- randomRIO (1, 2)
-    (posx, posy) <- getCoordinates div
+    d <- randomRIO (1, 2)
+    (posx, posy) <- getCoordinates d
     velx <- randomRIO (-10, 10)
     vely <- randomRIO (-10, 10)
     rot <- randomRIO (-180, 180)
@@ -52,15 +46,15 @@ newHaskelloids =
       (V2 velx vely)
       rot
       pitch
-      div
+      d
       img
-    ) [1..10]
+    ) ([1..10] :: [Int])
   where
-    getCoordinates div = do
+    getCoordinates d = do
       posx <- randomRIO (0, 800)
       posy <- randomRIO (0, 600)
-      if distance (V2 posx posy) (V2 400 300) < 20 + (50 / fromIntegral div)
-      then getCoordinates div
+      if distance (V2 posx posy) (V2 400 300) < 20 + (50 / fromIntegral d)
+      then getCoordinates d
       else return (posx, posy)
 
 updateHaskelloid :: Double -> Haskelloid -> Haskelloid
@@ -120,8 +114,8 @@ drawSpinner ctx x y cr ct = do
   restore ctx
 
 drawHaskelloid :: Haskelloid -> Affection UserData ()
-drawHaskelloid (Haskelloid pos _ rot _ div img) = do
+drawHaskelloid (Haskelloid pos _ rot _ d img) = do
   ctx <- nano <$> getAffection
   liftIO $ drawImage ctx img (pos - fmap (/2) dim) dim rot 255
   where
-    dim = fmap (/ fromIntegral div) (V2 100 100)
+    dim = fmap (/ fromIntegral d) (V2 100 100)

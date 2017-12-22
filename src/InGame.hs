@@ -221,7 +221,7 @@ drawWonLost wl = do
     let color = case wl of
           Won -> rgba 128 255 0 255
           Lost -> rgba 255 128 0 255
-        text = case wl of
+        textStr = case wl of
           Won -> "YOU WON!"
           Lost -> "YOU LOsT!"
     save ctx
@@ -229,7 +229,7 @@ drawWonLost wl = do
     fontFace ctx "modulo"
     textAlign ctx (S.fromList [AlignCenter,AlignTop])
     fillColor ctx (rgba 255 255 255 255)
-    textBox ctx 0 200 800 text
+    textBox ctx 0 200 800 textStr
     fillColor ctx color
     fontSize ctx 40
     textBox ctx 0 350 800 "Press [Esc] to exit\nPress [R] to try again"

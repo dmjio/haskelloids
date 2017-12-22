@@ -4,7 +4,6 @@ module Init where
 import Affection as A
 
 import SDL (($=))
-import qualified SDL
 
 import qualified Graphics.Rendering.OpenGL as GL
 
@@ -15,7 +14,6 @@ import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
 import Control.Concurrent.STM
 
-import System.Random
 import System.Exit (exitFailure)
 
 import Linear
@@ -77,4 +75,5 @@ load = do
     , font = fromJust mfont
     , subsystems = subs
     , haskImage = fromJust mhaskImage
+    , stateUUIDs = UUIDClean [] []
     }

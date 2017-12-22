@@ -3,21 +3,12 @@ module Menu where
 import Affection as A
 import qualified SDL
 
-import Debug.Trace
-
-import Data.Maybe
 import qualified Data.Set as S
 
 import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
 
-import qualified Data.Map as M
-
-import NanoVG hiding (V2(..), V4(..))
-
-import Linear
-
-import Foreign.C.Types
+import NanoVG
 
 -- internal imports
 

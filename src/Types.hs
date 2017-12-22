@@ -3,7 +3,6 @@
 module Types where
 
 import Affection
-import qualified SDL
 import NanoVG hiding (V2(..))
 import Linear
 
@@ -16,7 +15,6 @@ data UserData = UserData
   , shots :: [Pew]
   -- , debris :: ParticleSystem
   , wonlost :: Maybe WonLost
-  , pixelSize :: Int
   , state :: State
   , fade :: MenuFade
   , nano :: Context
