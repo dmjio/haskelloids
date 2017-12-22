@@ -4,6 +4,7 @@ module Init where
 import Affection as A
 
 import SDL (($=))
+import qualified SDL
 
 import qualified Graphics.Rendering.OpenGL as GL
 
@@ -33,6 +34,7 @@ load :: IO UserData
 load = do
   -- liftIO $ logIO A.Debug "Let's drop some Hints for SDL"
   -- SDL.HintRenderDriver $= SDL.OpenGL
+  SDL.cursorVisible $= False
   GL.clearColor $= GL.Color4 0 0 0.1 1
   liftIO $ logIO A.Debug "init GLEW"
   _ <- glewInit
