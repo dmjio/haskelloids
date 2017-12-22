@@ -37,16 +37,16 @@ wrapAround (V2 nx ny) width = V2 nnx nny
     half = width / 2
 
 newHaskelloids :: Affection UserData [Haskelloid]
-newHaskelloids = do
+newHaskelloids =
+  do
   img <- haskImage <$> getAffection
   liftIO $ mapM (\_ -> do
-    posx <- randomRIO (0, 800)
-    posy <- randomRIO (0, 600)
+    div <- randomRIO (1, 2)
+    (posx, posy) <- getCoordinates div
     velx <- randomRIO (-10, 10)
     vely <- randomRIO (-10, 10)
     rot <- randomRIO (-180, 180)
     pitch <- randomRIO (-pi, pi)
-    div <- randomRIO (1, 2)
     return $ Haskelloid
       (V2 posx posy)
       (V2 velx vely)
@@ -55,6 +55,13 @@ newHaskelloids = do
       div
       img
     ) [1..10]
+  where
+    getCoordinates div = do
+      posx <- randomRIO (0, 800)
+      posy <- randomRIO (0, 600)
+      if distance (V2 posx posy) (V2 400 300) < 20 + (50 / fromIntegral div)
+      then getCoordinates div
+      else return (posx, posy)
 
 updateHaskelloid :: Double -> Haskelloid -> Haskelloid
 updateHaskelloid dsec has =
