@@ -1,4 +1,5 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Types where
 
@@ -66,13 +67,15 @@ data Subsystems = Subsystems
   }
 
 data UUIDClean = UUIDClean
-  { uuWindow   :: [MsgId WindowMessage]
-  , uuKeyboard :: [MsgId KeyboardMessage]
+  { uuWindow   :: [UUID]
+  , uuKeyboard :: [UUID]
   }
 
 newtype Window = Window (TVar [(UUID, WindowMessage -> Affection UserData ())])
 
-instance Participant Window WindowMessage UserData where
+instance Participant Window UserData where
+  type Mesg Window UserData = WindowMessage
+
   partSubscribers (Window t) = do
     subTups <- liftIO $ readTVarIO t
     return $ map snd subTups
@@ -80,9 +83,9 @@ instance Participant Window WindowMessage UserData where
   partSubscribe (Window t) funct = do
     uuid <- genUUID
     liftIO $ atomically $ modifyTVar' t ((uuid, funct) :)
-    return $ MsgId uuid MsgWindowEmptyEvent
+    return uuid
 
-  partUnSubscribe (Window t) (MsgId uuid _) =
+  partUnSubscribe (Window t) uuid =
     liftIO $ atomically $ modifyTVar' t (filter (`filterMsg` uuid))
     where
       filterMsg :: (UUID, WindowMessage -> Affection UserData ()) -> UUID -> Bool
@@ -93,7 +96,9 @@ instance SDLSubsystem Window UserData where
 
 newtype Keyboard = Keyboard (TVar [(UUID, KeyboardMessage -> Affection UserData ())])
 
-instance Participant Keyboard KeyboardMessage UserData where
+instance Participant Keyboard UserData where
+  type Mesg Keyboard UserData = KeyboardMessage
+
   partSubscribers (Keyboard t) = do
     subTups <- liftIO $ readTVarIO t
     return $ map snd subTups
@@ -101,9 +106,9 @@ instance Participant Keyboard KeyboardMessage UserData where
   partSubscribe (Keyboard t) funct = do
     uuid <- genUUID
     liftIO $ atomically $ modifyTVar' t ((uuid, funct) :)
-    return $ MsgId uuid MsgKeyboardEmptyEvent
+    return uuid
 
-  partUnSubscribe (Keyboard t) (MsgId uuid _) =
+  partUnSubscribe (Keyboard t) uuid =
     liftIO $ atomically $ modifyTVar' t (filter (`filterMsg` uuid))
     where
       filterMsg :: (UUID, KeyboardMessage -> Affection UserData ()) -> UUID -> Bool

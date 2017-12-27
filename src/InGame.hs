@@ -129,16 +129,16 @@ updateGame sec = do
        || any (checkFriendlyFire (ship ud2)) (shots ud2)
        )
     && isNothing (wonlost ud2)
-    )
-    (putAffection ud2
-      { wonlost = Just Lost
-      }
-    )
-  when (isNothing (wonlost ud2) && null (haskelloids ud2))
-    (putAffection ud2
+    ) $ do
+      liftIO $ logIO A.Debug "You Lost!"
+      putAffection ud2
+        { wonlost = Just Lost
+        }
+  when (isNothing (wonlost ud2) && null (haskelloids ud2)) $ do
+    liftIO $ logIO A.Debug "You Won!"
+    putAffection ud2
       { wonlost = Just Won
       }
-    )
 
 checkShotDown :: Affection UserData ()
 checkShotDown =
