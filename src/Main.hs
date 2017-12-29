@@ -30,6 +30,7 @@ main = do
         { SDL.glProfile        = SDL.Core SDL.Normal 3 2
         , SDL.glColorPrecision = V4 8 8 8 1
         }
+      , SDL.windowResizable = True
       }
     , initScreenMode = SDL.Windowed
     , canvasSize     = Nothing
@@ -48,9 +49,15 @@ pre = do
   _ <- partSubscribe (subWindow subs) $ \msg -> case msg of
     MsgWindowResize _ _ (V2 w h) -> do
       liftIO $ logIO A.Debug "Window has been resized"
-      let nw = floor (fromIntegral h * (800/600) :: Double)
-          dw = floor ((fromIntegral w - fromIntegral nw) / 2 :: Double)
-      GL.viewport $= (GL.Position dw 0, GL.Size nw h)
+      if (fromIntegral w / fromIntegral h) > (800/600)
+      then do
+        let nw = floor (fromIntegral h * (800/600) :: Double)
+            dw = floor ((fromIntegral w - fromIntegral nw) / 2 :: Double)
+        GL.viewport $= (GL.Position dw 0, GL.Size nw h)
+      else do
+        let nh = floor (fromIntegral w / (800/600) :: Double)
+            dh = floor ((fromIntegral h - fromIntegral nh) / 2 :: Double)
+        GL.viewport $= (GL.Position 0 dh, GL.Size w nh)
     _ -> return ()
   _ <- partSubscribe (subKeyboard subs) $ \kbdev ->
     when (msgKbdKeyMotion kbdev == SDL.Pressed) $
@@ -76,9 +83,6 @@ handle e = do
 draw :: Affection UserData ()
 draw = do
   ud <- getAffection
-  -- window <- drawWindow <$> get
-  -- pf <- liftIO $ SDL.getWindowPixelFormat window
-  -- liftIO $ logIO A.Debug $ "Window pixel format: " ++ show pf
   liftIO $ beginFrame (nano ud) 800 600 1
   smDraw (state ud)
   drawVignette
