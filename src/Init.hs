@@ -8,6 +8,8 @@ import qualified SDL
 
 import qualified Graphics.Rendering.OpenGL as GL
 
+import NanoVG hiding (V2(..))
+
 import qualified Data.Set as S
 import Data.Maybe
 
@@ -18,8 +20,6 @@ import Control.Concurrent.STM
 import System.Exit (exitFailure)
 
 import Linear
-
-import NanoVG hiding (V2)
 
 import Foreign.C.Types (CInt(..))
 
