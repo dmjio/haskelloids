@@ -238,7 +238,7 @@ drawWonLost wl = do
 drawShip :: Ship -> Affection UserData ()
 drawShip Ship{..} = do
   ctx <- nano <$> getAffection
-  liftIO $ drawImage ctx sImg (sPos - fmap (/2) dim) dim sRot 255
+  liftIO $ drawImage ctx sImg (sPos - fmap (/2) dim) dim sRot 1
   where
     dim = V2 40 40
 

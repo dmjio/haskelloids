@@ -116,6 +116,6 @@ drawSpinner ctx x y cr ct = do
 drawHaskelloid :: Haskelloid -> Affection UserData ()
 drawHaskelloid (Haskelloid pos _ rot _ d img) = do
   ctx <- nano <$> getAffection
-  liftIO $ drawImage ctx img (pos - fmap (/2) dim) dim rot 255
+  liftIO $ drawImage ctx img (pos - fmap (/2) dim) dim rot 1
   where
     dim = fmap (/ fromIntegral d) (V2 100 100)
