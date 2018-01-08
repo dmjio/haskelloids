@@ -14,8 +14,8 @@
    id="svg18"
    sodipodi:docname="haskelloid.svg"
    inkscape:export-filename="/home/nek0/workspace/Haskell/haskelloids/assets/haskelloid.png"
-   inkscape:export-xdpi="62"
-   inkscape:export-ydpi="62"
+   inkscape:export-xdpi="96.096687"
+   inkscape:export-ydpi="96.096687"
    inkscape:version="0.92.2 (5c3e80d, 2017-08-06)">
   <metadata
      id="metadata22">
@@ -42,7 +42,7 @@
      id="namedview20"
      showgrid="false"
      inkscape:zoom="0.52034733"
-     inkscape:cx="234.77911"
+     inkscape:cx="325.10339"
      inkscape:cy="226.77161"
      inkscape:window-x="0"
      inkscape:window-y="26"
@@ -57,24 +57,28 @@
          id="path2" />
     </clipPath>
   </defs>
-  <path
-     style="clip-rule:nonzero;fill:#9e4e2e;fill-opacity:1;fill-rule:nonzero;stroke:none"
-     d="M 0,340.15625 113.38672,170.07812 0,0 H 85.039062 L 198.42578,170.07812 85.039062,340.15625 Z m 0,0"
-     id="path7"
-     inkscape:connector-curvature="0" />
-  <path
-     style="clip-rule:nonzero;fill:#d18161;fill-opacity:1;fill-rule:nonzero;stroke:none"
-     d="M 113.38672,340.15625 226.77344,170.07812 113.38672,0 h 85.03906 L 425.19531,340.15625 H 340.15625 L 269.29297,233.85937 198.42578,340.15625 Z m 0,0"
-     id="path9"
-     inkscape:connector-curvature="0" />
-  <path
-     style="clip-rule:nonzero;fill:#9e4e2e;fill-opacity:1;fill-rule:nonzero;stroke:none"
-     d="m 387.40234,240.94531 -37.79297,-56.6914 132.28125,-0.004 v 56.69531 z m 0,0"
-     id="path11"
-     inkscape:connector-curvature="0" />
-  <path
-     style="clip-rule:nonzero;fill:#9e4e2e;fill-opacity:1;fill-rule:nonzero;stroke:none"
-     d="m 330.71094,155.90625 -37.79688,-56.691406 188.97656,-0.0039 v 56.695316 z m 0,0"
-     id="path13"
-     inkscape:connector-curvature="0" />
+  <g
+     id="surface0">
+    <g
+       clip-path="url(#clip1)"
+       clip-rule="nonzero"
+       id="g15">
+      <path
+         style=" stroke:none;fill-rule: nonzero; fill: rgb(40%,40%,40%); fill-opacity: 1;"
+         d="M 0 340.15625 L 113.386719 170.078125 L 0 0 L 85.039062 0 L 198.425781 170.078125 L 85.039062 340.15625 L 0 340.15625 Z M 0 340.15625 "
+         id="path7" />
+      <path
+         style=" stroke:none;fill-rule: nonzero; fill: rgb(60%,60%,60%); fill-opacity: 1;"
+         d="M 113.386719 340.15625 L 226.773438 170.078125 L 113.386719 0 L 198.425781 0 L 425.195312 340.15625 L 340.15625 340.15625 L 269.292969 233.859375 L 198.425781 340.15625 L 113.386719 340.15625 Z M 113.386719 340.15625 "
+         id="path9" />
+      <path
+         style=" stroke:none;fill-rule: nonzero; fill: rgb(40%,40%,40%); fill-opacity: 1;"
+         d="M 387.402344 240.945312 L 349.609375 184.253906 L 481.890625 184.25 L 481.890625 240.945312 L 387.402344 240.945312 Z M 387.402344 240.945312 "
+         id="path11" />
+      <path
+         style=" stroke:none;fill-rule: nonzero; fill: rgb(40%,40%,40%); fill-opacity: 1;"
+         d="M 330.710938 155.90625 L 292.914062 99.214844 L 481.890625 99.210938 L 481.890625 155.90625 L 330.710938 155.90625 Z M 330.710938 155.90625 "
+         id="path13" />
+    </g>
+  </g>
 </svg>
