@@ -28,6 +28,7 @@ data UserData = UserData
 data Ship = Ship
   { sPos :: V2 Float
   , sVel :: V2 Float
+  , sThrust :: Bool
   , sRot :: Float
   , sImg :: Image
   }

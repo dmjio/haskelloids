@@ -46,6 +46,7 @@ loadGame stateChange clean = do
       { sPos = V2 400 300
       , sVel = V2 0 0
       , sRot = 0
+      , sThrust = False
       }
     , shots = []
     , state = InGame
@@ -53,8 +54,8 @@ loadGame stateChange clean = do
     }
 
 handleGameKeys :: Affection UserData () -> Affection UserData () -> KeyboardMessage -> Affection UserData ()
-handleGameKeys stateChange clean kbdev = when (msgKbdKeyMotion kbdev == SDL.Pressed) $
-  case SDL.keysymKeycode (msgKbdKeysym kbdev) of
+handleGameKeys stateChange clean kbdev = if (msgKbdKeyMotion kbdev == SDL.Pressed)
+  then case SDL.keysymKeycode (msgKbdKeysym kbdev) of
     SDL.KeycodeSpace -> unless (msgKbdKeyRepeat kbdev) $ do
       liftIO $ logIO A.Debug "PEW!"
       shoot
@@ -67,9 +68,15 @@ handleGameKeys stateChange clean kbdev = when (msgKbdKeyMotion kbdev == SDL.Pres
       liftIO $ logIO A.Debug "Leave to Menu"
       stateChange
     SDL.KeycodeW -> accelShip dVel
-    SDL.KeycodeS -> accelShip (-dVel)
+    -- SDL.KeycodeS -> accelShip (-dVel)
     SDL.KeycodeA -> rotateShip dRot
     SDL.KeycodeD -> rotateShip (-dRot)
+    _ -> return ()
+  else case SDL.keysymKeycode (msgKbdKeysym kbdev) of
+    SDL.KeycodeW -> deThrust
+    -- SDL.KeycodeS -> deThrust
+    SDL.KeycodeA -> deThrust
+    SDL.KeycodeD -> deThrust
     _ -> return ()
 
 shoot :: Affection UserData ()
@@ -92,6 +99,16 @@ accelShip vel = do
   putAffection ud
     { ship = s
       { sVel = nVel
+      , sThrust = True
+      }
+    }
+
+deThrust :: Affection UserData ()
+deThrust = do
+  ud <- getAffection
+  putAffection ud
+    { ship = (ship ud)
+      { sThrust = False
       }
     }
 
@@ -238,7 +255,23 @@ drawWonLost wl = do
 drawShip :: Ship -> Affection UserData ()
 drawShip Ship{..} = do
   ctx <- nano <$> getAffection
-  liftIO $ drawImage ctx sImg (sPos - fmap (/2) dim) dim sRot 1
+  liftIO $ do
+    when (sThrust) $ do
+      let pos@(V2 px py) = fmap CFloat sPos - V2 0 10 `rotVec` CFloat sRot
+          V2 x1 y1 = pos - (V2 10 0 `rotVec` CFloat sRot)
+          V2 x2 y2 = pos + (V2 10 0 `rotVec` CFloat sRot)
+          V2 x3 y3 = pos - (V2 0 25 `rotVec` CFloat sRot)
+      save ctx
+      grad <- linearGradient ctx px py x3 y3 (rgba 255 128 0 255) (rgba 0 0 0 0)
+      fillPaint ctx grad
+      beginPath ctx
+      moveTo ctx x1 y1
+      lineTo ctx x2 y2
+      lineTo ctx x3 y3
+      closePath ctx
+      fill ctx
+      restore ctx
+    drawImage ctx sImg (sPos - fmap (/2) dim) dim sRot 1
   where
     dim = V2 40 40
 
