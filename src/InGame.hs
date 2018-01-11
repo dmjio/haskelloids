@@ -33,12 +33,17 @@ pewTTL = 10
 dRot :: Float
 dRot = 150
 
-loadGame :: Affection UserData () -> Affection UserData () -> Affection UserData ()
+loadGame
+  :: Affection UserData ()
+  -> Affection UserData ()
+  -> Affection UserData ()
 loadGame stateChange clean = do
   liftIO $ logIO A.Debug "loading game"
   ud <- getAffection
   nhs <- newHaskelloids
-  kid <- partSubscribe (subKeyboard $ subsystems ud) (handleGameKeys stateChange clean)
+  kid <- partSubscribe
+    (subKeyboard $ subsystems ud)
+    (handleGameKeys stateChange clean)
   putAffection ud
     { stateUUIDs = UUIDClean [] [kid]
     , haskelloids = nhs
@@ -53,11 +58,15 @@ loadGame stateChange clean = do
     , wonlost = Nothing
     }
 
-handleGameKeys :: Affection UserData () -> Affection UserData () -> KeyboardMessage -> Affection UserData ()
-handleGameKeys stateChange clean kbdev = if (msgKbdKeyMotion kbdev == SDL.Pressed)
+handleGameKeys
+  :: Affection UserData ()
+  -> Affection UserData ()
+  -> KeyboardMessage
+  -> Affection UserData ()
+handleGameKeys stateChange clean kbdev =
+  if (msgKbdKeyMotion kbdev == SDL.Pressed)
   then case SDL.keysymKeycode (msgKbdKeysym kbdev) of
     SDL.KeycodeSpace -> unless (msgKbdKeyRepeat kbdev) $ do
-      liftIO $ logIO A.Debug "PEW!"
       shoot
     SDL.KeycodeR -> unless (msgKbdKeyRepeat kbdev) $ do
       ud <- getAffection
@@ -68,13 +77,11 @@ handleGameKeys stateChange clean kbdev = if (msgKbdKeyMotion kbdev == SDL.Presse
       liftIO $ logIO A.Debug "Leave to Menu"
       stateChange
     SDL.KeycodeW -> accelShip dVel
-    -- SDL.KeycodeS -> accelShip (-dVel)
     SDL.KeycodeA -> rotateShip dRot
     SDL.KeycodeD -> rotateShip (-dRot)
     _ -> return ()
   else case SDL.keysymKeycode (msgKbdKeysym kbdev) of
     SDL.KeycodeW -> deThrust
-    -- SDL.KeycodeS -> deThrust
     SDL.KeycodeA -> deThrust
     SDL.KeycodeD -> deThrust
     _ -> return ()
@@ -161,12 +168,18 @@ checkShotDown :: Affection UserData ()
 checkShotDown =
   do
     ud <- getAffection
-    let shoots = shots ud
+    let pews = shots ud
         hasks = haskelloids ud
-        pairs = catMaybes $ concatMap (crossOut hasks) shoots
+        pairs = catMaybes $ concatMap (crossOut hasks) pews
         deadHasks = map fst pairs
-        nhask = foldl (\acc a -> filter (\x -> a /= x) acc) hasks deadHasks
-        npews = foldl (\acc a -> filter (\x -> a /= x) acc) shoots (map snd pairs)
+        nhask = foldl
+          (\acc a -> filter (\x -> a /= x) acc)
+          hasks
+          deadHasks
+        npews = foldl
+          (\acc a -> filter (\x -> a /= x) acc)
+          pews
+          (map snd pairs)
     children <- liftIO $ concat <$> mapM (\Haskelloid{..} -> do
       n1velx <- randomRIO (-10, 10)
       n1vely <- randomRIO (-10, 10)
@@ -257,10 +270,11 @@ drawShip Ship{..} = do
   ctx <- nano <$> getAffection
   liftIO $ do
     when (sThrust) $ do
-      let pos@(V2 px py) = fmap CFloat sPos - V2 0 10 `rotVec` CFloat sRot
-          V2 x1 y1 = pos - (V2 10 0 `rotVec` CFloat sRot)
-          V2 x2 y2 = pos + (V2 10 0 `rotVec` CFloat sRot)
-          V2 x3 y3 = pos - (V2 0 25 `rotVec` CFloat sRot)
+      let pos@(V2 px py) = fmap CFloat sPos - V2 0 10 `rotVec` cRot
+          V2 x1 y1 = pos - (V2 10 0 `rotVec` cRot)
+          V2 x2 y2 = pos + (V2 10 0 `rotVec` cRot)
+          V2 x3 y3 = pos - (V2 0 25 `rotVec` cRot)
+          cRot = CFloat sRot
       save ctx
       grad <- linearGradient ctx px py x3 y3 (rgba 255 128 0 255) (rgba 0 0 0 0)
       fillPaint ctx grad

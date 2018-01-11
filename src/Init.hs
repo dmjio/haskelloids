@@ -67,6 +67,7 @@ load = do
       , sVel = V2 0 0
       , sRot = 0
       , sImg = fromJust mshipImage
+      , sThrust = False
       }
     , haskelloids = []
     , shots = []

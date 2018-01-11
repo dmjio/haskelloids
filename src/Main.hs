@@ -2,9 +2,7 @@
 module Main where
 
 import Affection as A
-import SDL (($=))
 import qualified SDL
-import qualified Graphics.Rendering.OpenGL as GL
 
 import Linear as L
 
@@ -46,19 +44,7 @@ pre :: Affection UserData ()
 pre = do
   subs <- subsystems <$> getAffection
   liftIO $ logIO A.Debug "Setting global resize event listener"
-  _ <- partSubscribe (subWindow subs) $ \msg -> case msg of
-    MsgWindowResize _ _ (V2 w h) -> do
-      liftIO $ logIO A.Debug "Window has been resized"
-      if (fromIntegral w / fromIntegral h) > (800/600)
-      then do
-        let nw = floor (fromIntegral h * (800/600) :: Double)
-            dw = floor ((fromIntegral w - fromIntegral nw) / 2 :: Double)
-        GL.viewport $= (GL.Position dw 0, GL.Size nw h)
-      else do
-        let nh = floor (fromIntegral w / (800/600) :: Double)
-            dh = floor ((fromIntegral h - fromIntegral nh) / 2 :: Double)
-        GL.viewport $= (GL.Position 0 dh, GL.Size w nh)
-    _ -> return ()
+  _ <- partSubscribe (subWindow subs) (fitViewport (800/600))
   _ <- partSubscribe (subKeyboard subs) $ \kbdev ->
     when (msgKbdKeyMotion kbdev == SDL.Pressed) $
       case SDL.keysymKeycode (msgKbdKeysym kbdev) of
